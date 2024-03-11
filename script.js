@@ -87,7 +87,7 @@ class WebBLE {
         .then(characteristic => {
             console.log("Characteristic discovered:", characteristic.uuid);
             this.bleHandle.sensorCharacteristicFound = characteristic;
-            characteristic.addEventListener('characteristicvaluechanged', this.handleCharacteristicChange);
+            characteristic.addEventListener('characteristicvaluechanged', this.handleCharacteristicChange.bind(this));
             characteristic.startNotifications();
             console.log("Notifications Started.");
             return characteristic.readValue();
