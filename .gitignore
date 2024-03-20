@@ -1,0 +1,10 @@
+*
+!*/*
+
+# Track this file
+!.gitignore
+!README.md
+
+# Whitelist these:
+!WebBleClient/
+!WebBleServer/

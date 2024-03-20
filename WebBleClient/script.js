@@ -42,11 +42,11 @@ class WebBLE {
         });
 
         // Disconnect Button
-        this.dom.disconnectButton.addEventListener('click', this.disconnectDevice);
+        this.dom.disconnectButton.addEventListener('click', this.disconnectDevice.bind(this));
 
         // Write to the ESP32 LED Characteristic
-        this.dom.onButton.addEventListener('click', () => this.writeOnCharacteristic(1));
-        this.dom.offButton.addEventListener('click', () => this.writeOnCharacteristic(0));
+        this.dom.onButton.addEventListener('click', () => this.writeOnCharacteristic(1).bind(this));
+        this.dom.offButton.addEventListener('click', () => this.writeOnCharacteristic(0).bind(this));
     }
 
     isWebBluetoothEnabled() {
@@ -71,7 +71,7 @@ class WebBLE {
             console.log('Device Selected:', device.name);
             this.dom.bleStateContainer.innerHTML = 'Connected to device ' + device.name;
             this.dom. bleStateContainer.style.color = "#24af37";
-            device.addEventListener('gattservicedisconnected', this.onDisconnected);
+            device.addEventListener('gattservicedisconnected', this.onDisconnected.bind(this));
             return device.gatt.connect();
         })
         .then(gattServer =>{
@@ -120,7 +120,7 @@ class WebBLE {
     }
 
     writeOnCharacteristic(value){
-        if (this.bleHandle.bleServer && this.bleHandle.bleServer.connected) {
+        if(this.bleHandle.bleServer && this.bleHandle.bleServer.connected) {
             this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.ledCharacteristic)
             .then(characteristic => {
                 console.log("Found the LED characteristic: ", characteristic.uuid);
@@ -142,8 +142,8 @@ class WebBLE {
 
     disconnectDevice() {
         console.log("Disconnect Device.");
-        if (this.bleHandle.bleServer && this.bleHandle.bleServer.connected) {
-            if (this.bleHandle.sensorCharacteristicFound) {
+        if(this.bleHandle.bleServer && this.bleHandle.bleServer.connected) {
+            if(this.bleHandle.sensorCharacteristicFound) {
                 this.bleHandle.sensorCharacteristicFound.stopNotifications()
                     .then(() => {
                         console.log("Notifications Stopped");
