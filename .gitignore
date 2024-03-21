@@ -8,3 +8,4 @@
 # Whitelist these:
 !WebBleClient/
 !WebBleServer/
+!WebBleServer/*/*
