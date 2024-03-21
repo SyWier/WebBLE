@@ -5,6 +5,7 @@ class WebBLE {
             bleServer : null,
             bleServiceFound : null,
             sensorCharacteristicFound : null,
+            ledCharacteristicFound : null,
         };
 
         // Define BLE Device Specs
@@ -14,10 +15,14 @@ class WebBLE {
             sensorCharacteristic: '19b10001-e8f2-537e-4f6c-d104768a1214',
             ledCharacteristic : '19b10002-e8f2-537e-4f6c-d104768a1214',
         };
+
         // Request and Response
-        this.bleWeb = {
-            bleService : '19b20000-e8f2-537e-4f6c-d104768a1214',
+        this.bleReq = {
+            service : '19b20000-e8f2-537e-4f6c-d104768a1214',
             requestChar : '19b20001-e8f2-537e-4f6c-d104768a1214',
+            server : null,
+            serviceFound : null,
+            characteristicFound : null,
         };
 
         this.getDomElements();
@@ -53,8 +58,8 @@ class WebBLE {
         this.dom.disconnectButton.addEventListener('click', this.disconnectDevice.bind(this));
 
         // Write to the ESP32 LED Characteristic
-        this.dom.onButton.addEventListener('click', () => this.writeOnCharacteristic(1).bind(this));
-        this.dom.offButton.addEventListener('click', () => this.writeOnCharacteristic(0).bind(this));
+        this.dom.onButton.addEventListener('click', () => this.writeOnCharacteristic(1));
+        this.dom.offButton.addEventListener('click', () => this.writeOnCharacteristic(0));
 
         // Request data
         this.btn.btnA.addEventListener('click', () => this.requestData("btnA"));
@@ -92,7 +97,7 @@ class WebBLE {
         console.log('Initializing Bluetooth...');
         navigator.bluetooth.requestDevice({
             filters: [{name: this.bleSpecs.deviceName}],
-            optionalServices: [this.bleSpecs.bleService]
+            optionalServices: [this.bleSpecs.bleService, this.bleReq.service]
         })
         .then(device => {
             console.log('Device Selected:', device.name);
@@ -104,27 +109,93 @@ class WebBLE {
         .then(gattServer => {
             console.log("Connected to GATT Server");
             this.bleHandle.bleServer = gattServer;
-            this.initCounterFetch().bind(this);
+            this.getRandomNerdTutorialService();
+            this.initCommunication();
         })
         .catch(error => {
             console.log('Error: ', error);
         })
-
-        
     }
 
-    // Get Counter Characteristics and Enable Notifications
-    initCounterFetch() {
+    getRandomNerdTutorialService() {
         this.bleHandle.bleServer.getPrimaryService(this.bleSpecs.bleService)
         .then(service => {
             console.log("Service discovered:", service.uuid);
             this.bleHandle.bleServiceFound = service;
-            return service.getCharacteristic(this.bleSpecs.sensorCharacteristic);
+            this.initCounterFetch();
+            this.initLedWrite();
+        })
+    }
+
+    // Get Counter Characteristics and Enable Notifications
+    initCounterFetch() {
+        this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.sensorCharacteristic)
+        .then(characteristic => {
+            console.log("Characteristic discovered:", characteristic.uuid);
+            this.bleHandle.sensorCharacteristicFound = characteristic;
+            characteristic.addEventListener('characteristicvaluechanged', this.handleFetch.bind(this));
+            characteristic.startNotifications();
+            console.log("Notifications Started.");
+            // Read current value
+            return characteristic.readValue();
+        })
+        .then(value => {
+            console.log("Read value: ", value);
+            const decodedValue = new TextDecoder().decode(value);
+            console.log("Decoded value: ", decodedValue);
+            this.dom.retrievedValue.innerHTML = decodedValue;
+            this.dom.timestampContainer.innerHTML = getDateTime();
+        })
+    }
+
+    handleFetch(event){
+        const newValueReceived = new TextDecoder().decode(event.target.value);
+        console.log("Characteristic value changed: ", newValueReceived);
+        this.dom.retrievedValue.innerHTML = newValueReceived;
+        this.dom.timestampContainer.innerHTML = getDateTime();
+    }
+
+    initLedWrite() {
+        this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.ledCharacteristic)
+        .then(characteristic => {
+            console.log("Found the LED characteristic: ", characteristic.uuid);
+            this.bleHandle.ledCharacteristicFound = characteristic;
+        })
+        .catch(error => {
+            console.error("Error: ", error);
+        });
+    }
+
+    writeOnCharacteristic(value){
+        if(!this.isBleConnected()) {
+            return false;
+        }
+        if(!this.bleHandle.bleServiceFound) {
+            return false;
+        }
+
+        const data = new Uint8Array([value]);
+        this.bleHandle.ledCharacteristicFound.writeValue(data)
+        .then(() => {
+            this.dom.latestValueSent.innerHTML = value;
+            console.log("Value written to LED characteristic:", value);
+        })
+        .catch(error => {
+            console.error("Error writing to the LED characteristic: ", error);
+        });
+    }
+
+    initCommunication() {
+        this.bleHandle.bleServer.getPrimaryService(this.bleReq.service)
+        .then(service => {
+            console.log("Service discovered:", service.uuid);
+            this.bleHandle.bleServiceFound = service;
+            return service.getCharacteristic(this.bleReq.requestChar);
         })
         .then(characteristic => {
             console.log("Characteristic discovered:", characteristic.uuid);
             this.bleHandle.sensorCharacteristicFound = characteristic;
-            characteristic.addEventListener('characteristicvaluechanged', this.handleCharacteristicChange.bind(this));
+            characteristic.addEventListener('characteristicvaluechanged', this.handleReceived.bind(this));
             characteristic.startNotifications();
             console.log("Notifications Started.");
             return characteristic.readValue();
@@ -136,6 +207,32 @@ class WebBLE {
             this.dom.retrievedValue.innerHTML = decodedValue;
             this.dom.timestampContainer.innerHTML = getDateTime();
         })
+    }
+    
+    handleReceived(event) {
+        const received = new TextDecoder().decode(event.target.value);
+        console.log("Received value: ", received);
+        this.btn.response.innerHTML = received;
+    }
+
+    requestData(value) {
+        if(!this.isBleConnected()) {
+            return false;
+        }
+        if(!this.bleReq.serviceFound) {
+            return false;
+        }
+
+        const data = new Uint8Array([value]);
+        this.bleReq.characteristicFound.writeValue(data)
+        .then(() => {
+            this.btn.response.innerHTML = value;
+            console.log("Requested sent. Value:", value);
+        })
+        .catch(error => {
+            console.error("Error requesting data: ", error);
+        });
+
     }
 
     disconnectDevice() {
@@ -168,46 +265,6 @@ class WebBLE {
         console.log('Device Disconnected:', event.target.device.name);
         this.dom.bleStateContainer.innerHTML = "Device disconnected";
         this.dom.bleStateContainer.style.color = "#d13a30";
-    
-        connectToDevice();
-    }
-    
-    handleCharacteristicChange(event){
-        const newValueReceived = new TextDecoder().decode(event.target.value);
-        console.log("Characteristic value changed: ", newValueReceived);
-        this.dom.retrievedValue.innerHTML = newValueReceived;
-        this.dom.timestampContainer.innerHTML = getDateTime();
-    }
-
-    writeOnCharacteristic(value){
-        if(!this.isBleConnected()) {
-            return false;
-        }
-        if(!this.bleHandle.bleServiceFound) {
-            return false;
-        }
-
-        this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.ledCharacteristic)
-        .then(characteristic => {
-            console.log("Found the LED characteristic: ", characteristic.uuid);
-            const data = new Uint8Array([value]);
-            return characteristic.writeValue(data);
-        })
-        .then(() => {
-            this.dom.latestValueSent.innerHTML = value;
-            console.log("Value written to LED characteristic:", value);
-        })
-        .catch(error => {
-            console.error("Error writing to the LED characteristic: ", error);
-        });
-    }
-
-    requestData(id) {
-        if(!this.isBleConnected()) {
-            return false;
-        }
-
-        this.btn.response.innerHTML = id;
     }
 
 }
