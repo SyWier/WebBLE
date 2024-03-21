@@ -3,8 +3,8 @@ class WebBLE {
         // Variables to Handle Bluetooth
         this.bleHandle = {
             bleServer : null,
-            bleServices : null,
-            sensorCharacteristics : null,
+            bleServiceFound : null,
+            sensorCharacteristicFound : null,
         };
 
         // Define BLE Device Specs
@@ -47,11 +47,7 @@ class WebBLE {
 
     createButtons() {
         // Connect Button (search for BLE Devices only if BLE is available)
-        this.dom.connectButton.addEventListener('click', () => {
-            if(this.isWebBluetoothEnabled()){
-                this.connectToDevice();
-            }
-        });
+        this.dom.connectButton.addEventListener('click', this.connectToDevice.bind(this));
 
         // Disconnect Button
         this.dom.disconnectButton.addEventListener('click', this.disconnectDevice.bind(this));
@@ -66,8 +62,8 @@ class WebBLE {
         this.btn.btnC.addEventListener('click', () => this.requestData("btnC"));
     }
 
+    // Check if BLE is available in your Browser
     isWebBluetoothEnabled() {
-        // Check if BLE is available in your Browser
         if(!navigator.bluetooth) {
             console.log('Web Bluetooth API is not available in this browser!');
             this.dom.bleStateContainer.innerHTML = "Web Bluetooth API is not available in this browser/device!";
@@ -86,27 +82,14 @@ class WebBLE {
             return false;
         }
     }
-    getServices(server) {
-        console.log("Discovering services...");
-        this.bleHandle.bleServer = server;
-        return server.getPrimaryServices();
-    }
 
-    getCharacteristics(services) {
-        services.forEach(service => {
-            console.log("Service discovered:", service.uuid);
-            console.log("Discovering characteristics...");
-            service.getCharacteristic(this.bleSpecs.sensorCharacteristic).then(characteristics => {
-                characteristics.forEach(characteristics => {
-                    console.log("Characteristics discovered:", service.uuid);
-                })
-            });
-        });
-    }
-
-    // Connect to BLE Device and Enable Notifications
+    // Connect to BLE Device
     connectToDevice(){
-        console.log('Requesting device...');
+        if(!this.isWebBluetoothEnabled()){
+            return false;
+        }
+
+        console.log('Initializing Bluetooth...');
         navigator.bluetooth.requestDevice({
             filters: [{name: this.bleSpecs.deviceName}],
             optionalServices: [this.bleSpecs.bleService]
@@ -116,13 +99,28 @@ class WebBLE {
             this.dom.bleStateContainer.innerHTML = 'Connected to device ' + device.name;
             this.dom.bleStateContainer.style.color = "#24af37";
             device.addEventListener('gattservicedisconnected', this.onDisconnected.bind(this));
-            console.log('Connecting to server...');
             return device.gatt.connect();
         })
-        .then(gattServer => { return this.getServices(gattServer); })
-        .then(services => { return this.getCharacteristics(services); })
-            // this.bleHandle.bleServices = services;
-            // this.getCharacteristics(services)
+        .then(gattServer => {
+            console.log("Connected to GATT Server");
+            this.bleHandle.bleServer = gattServer;
+            this.initCounterFetch().bind(this);
+        })
+        .catch(error => {
+            console.log('Error: ', error);
+        })
+
+        
+    }
+
+    // Get Counter Characteristics and Enable Notifications
+    initCounterFetch() {
+        this.bleHandle.bleServer.getPrimaryService(this.bleSpecs.bleService)
+        .then(service => {
+            console.log("Service discovered:", service.uuid);
+            this.bleHandle.bleServiceFound = service;
+            return service.getCharacteristic(this.bleSpecs.sensorCharacteristic);
+        })
         .then(characteristic => {
             console.log("Characteristic discovered:", characteristic.uuid);
             this.bleHandle.sensorCharacteristicFound = characteristic;
@@ -137,9 +135,6 @@ class WebBLE {
             console.log("Decoded value: ", decodedValue);
             this.dom.retrievedValue.innerHTML = decodedValue;
             this.dom.timestampContainer.innerHTML = getDateTime();
-        })
-        .catch(error => {
-            console.log('Error: ', error);
         })
     }
 
@@ -188,6 +183,9 @@ class WebBLE {
         if(!this.isBleConnected()) {
             return false;
         }
+        if(!this.bleHandle.bleServiceFound) {
+            return false;
+        }
 
         this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.ledCharacteristic)
         .then(characteristic => {
@@ -197,7 +195,7 @@ class WebBLE {
         })
         .then(() => {
             this.dom.latestValueSent.innerHTML = value;
-            console.log("Value written to LEDcharacteristic:", value);
+            console.log("Value written to LED characteristic:", value);
         })
         .catch(error => {
             console.error("Error writing to the LED characteristic: ", error);
@@ -210,20 +208,6 @@ class WebBLE {
         }
 
         this.btn.response.innerHTML = id;
-
-        this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.ledCharacteristic)
-        .then(characteristic => {
-            console.log("Found the LED characteristic: ", characteristic.uuid);
-            const data = new Uint8Array([value]);
-            return characteristic.writeValue(data);
-        })
-        .then(() => {
-            this.dom.latestValueSent.innerHTML = value;
-            console.log("Value written to LEDcharacteristic:", value);
-        })
-        .catch(error => {
-            console.error("Error writing to the LED characteristic: ", error);
-        });
     }
 
 }
