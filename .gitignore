@@ -1,5 +1,5 @@
 *
-!*/*
+!*/**
 
 # Track this file
 !.gitignore
@@ -8,5 +8,3 @@
 # Whitelist these:
 !WebBleClient/
 !WebBleServer/
-!WebBleServer/**
-

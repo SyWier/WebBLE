@@ -8,7 +8,7 @@ const int buttonPin = 10;
 
 void setup() {
     Serial.begin(115200);
-    // delay(10000);
+    delay(7000);
 
     // EzBLE EzBLE;
     // EzBLE.Init();
@@ -21,9 +21,9 @@ void setup() {
 }
 
 void loop() {
-    int val = digitalRead(buttonPin);
-    String str = "Button state: ";
-    Serial.println(str + val);
+    // int val = digitalRead(buttonPin);
+    // String str = "Button state: ";
+    // Serial.println(str + val);
     webServer.Update();
     delay(1000);
 }
