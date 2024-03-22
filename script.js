@@ -62,9 +62,9 @@ class WebBLE {
         this.dom.offButton.addEventListener('click', () => this.writeOnCharacteristic(0));
 
         // Request data
-        this.btn.btnA.addEventListener('click', () => this.requestData("btnA"));
-        this.btn.btnB.addEventListener('click', () => this.requestData("btnB"));
-        this.btn.btnC.addEventListener('click', () => this.requestData("btnC"));
+        this.btn.btnA.addEventListener('click', () => this.requestData(1));
+        this.btn.btnB.addEventListener('click', () => this.requestData(2));
+        this.btn.btnC.addEventListener('click', () => this.requestData(3));
     }
 
     // Check if BLE is available in your Browser
@@ -110,7 +110,7 @@ class WebBLE {
             console.log("Connected to GATT Server");
             this.bleHandle.bleServer = gattServer;
             this.getRandomNerdTutorialService();
-            this.initCommunication();
+            this.getUniComService();
         })
         .catch(error => {
             console.log('Error: ', error);
@@ -185,28 +185,23 @@ class WebBLE {
         });
     }
 
-    initCommunication() {
+    getUniComService() {
         this.bleHandle.bleServer.getPrimaryService(this.bleReq.service)
         .then(service => {
             console.log("Service discovered:", service.uuid);
-            this.bleHandle.bleServiceFound = service;
+            this.bleReq.serviceFound = service;
             return service.getCharacteristic(this.bleReq.requestChar);
         })
         .then(characteristic => {
             console.log("Characteristic discovered:", characteristic.uuid);
-            this.bleHandle.sensorCharacteristicFound = characteristic;
+            this.bleReq.characteristicFound = characteristic;
             characteristic.addEventListener('characteristicvaluechanged', this.handleReceived.bind(this));
             characteristic.startNotifications();
             console.log("Notifications Started.");
-            return characteristic.readValue();
         })
-        .then(value => {
-            console.log("Read value: ", value);
-            const decodedValue = new TextDecoder().decode(value);
-            console.log("Decoded value: ", decodedValue);
-            this.dom.retrievedValue.innerHTML = decodedValue;
-            this.dom.timestampContainer.innerHTML = getDateTime();
-        })
+        .catch(error => {
+            console.error("Error: ", error);
+        });
     }
     
     handleReceived(event) {
@@ -226,7 +221,6 @@ class WebBLE {
         const data = new Uint8Array([value]);
         this.bleReq.characteristicFound.writeValue(data)
         .then(() => {
-            this.btn.response.innerHTML = value;
             console.log("Requested sent. Value:", value);
         })
         .catch(error => {
