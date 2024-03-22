@@ -45,11 +45,9 @@ public:
 
         pUniService = nullptr;
         pUniCharacteristic = nullptr;
-        uniComCallback = new UniComCallback;
+        uniComCallback = new UniComCallback(&(serverCallback->deviceConnected));
 
         pAdvertising = nullptr;
-
-        
     }
 
     void Init() {
@@ -118,11 +116,11 @@ public:
     void InitUniComService() {
         // Create service with uuid
         Serial.println("Creating UniCom Service...");
-        pService = pServer->createService(UNI_SERVICE_UUID);
+        pUniService = pServer->createService(UNI_SERVICE_UUID);
 
-        // Create sensor characteristic with uuid
+        // Create UniCom Characteristic with UUID
         Serial.println("Creating UniCom Characteristics...");
-        pSensorCharacteristic = pService->createCharacteristic(
+        pUniCharacteristic = pUniService->createCharacteristic(
             UNI_CHARACTERISTIC_UUID,
             NIMBLE_PROPERTY::READ   |
             NIMBLE_PROPERTY::WRITE  |
@@ -131,11 +129,11 @@ public:
         );
 
         // Set callback class
-        pLedCharacteristic->setCallbacks(uniComCallback);
+        pUniCharacteristic->setCallbacks(uniComCallback);
         
         // Start service
         Serial.println("Start UniCom service!");
-        pService->start();
+        pUniService->start();
 
         // Advertice service
         pAdvertising->addServiceUUID(UNI_SERVICE_UUID);
