@@ -96,7 +96,8 @@ class WebBLE {
 
         console.log('Initializing Bluetooth...');
         navigator.bluetooth.requestDevice({
-            filters: [{name: this.bleSpecs.deviceName}],
+            filters: [{namePrefix: this.bleSpecs.deviceName}],
+            //filters: [{name: this.bleSpecs.deviceName}],
             optionalServices: [this.bleSpecs.bleService, this.bleReq.service]
         })
         .then(device => {
@@ -145,6 +146,9 @@ class WebBLE {
             console.log("Decoded value: ", decodedValue);
             this.dom.retrievedValue.innerHTML = decodedValue;
             this.dom.timestampContainer.innerHTML = getDateTime();
+        })
+        .catch(error => {
+            console.log('Error: ', error);
         })
     }
 

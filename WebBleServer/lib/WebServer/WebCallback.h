@@ -8,7 +8,7 @@ public:
 
     ServerCallback() : deviceConnected(false) {};
 
-    void onConnect(BLEServer* pServer) {
+    void onAuthenticationComplete(ble_gap_conn_desc* desc) {
       deviceConnected = true;
     };
 

@@ -56,6 +56,11 @@ public:
         // Init NimBLE on device
         NimBLEDevice::init("ESP32");
 
+        // Enable security
+        NimBLEDevice::setSecurityAuth(true, true, true);
+        NimBLEDevice::setSecurityPasskey(666666);
+        NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
+
         // Create NimBLE server
         Serial.println("Creating Server...");
         pServer = NimBLEDevice::createServer();
@@ -87,8 +92,9 @@ public:
         Serial.println("Creating RNT Fetch Characteristics...");
         pSensorCharacteristic = pService->createCharacteristic(
             RNT_SENSOR_CHARACTERISTIC_UUID,
-            NIMBLE_PROPERTY::READ   |
-            NIMBLE_PROPERTY::WRITE  |
+            NIMBLE_PROPERTY::READ |
+            NIMBLE_PROPERTY::READ_ENC |
+            NIMBLE_PROPERTY::READ_AUTHEN |
             NIMBLE_PROPERTY::NOTIFY |
             NIMBLE_PROPERTY::INDICATE
         );
@@ -98,7 +104,9 @@ public:
         Serial.println("Creating RNT LED Characteristics...");
         pLedCharacteristic = pService->createCharacteristic(
             RNT_LED_CHARACTERISTIC_UUID,
-            NIMBLE_PROPERTY::WRITE
+            NIMBLE_PROPERTY::WRITE |
+            NIMBLE_PROPERTY::WRITE_ENC |
+            NIMBLE_PROPERTY::WRITE_AUTHEN
         );
 
         // Set callback class
