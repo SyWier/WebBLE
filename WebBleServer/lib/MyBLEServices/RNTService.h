@@ -17,13 +17,12 @@ public:
     };
 
     void onWrite(BLECharacteristic* pLedCharacteristic) {
-        std::string value = pLedCharacteristic->getValue();
-        if (value.length() > 0) {
-            Serial.print("LED Characteristic event, written: ");
-            Serial.println(static_cast<int>(value[0])); // Print the integer value
+        NimBLEAttValue value = pLedCharacteristic->getValue();
 
-            int receivedValue = static_cast<int>(value[0]);
-            if (receivedValue == 1) {
+        if (value.length() > 0) {
+            DEBUG_MSG("LED Characteristic event, written: %d\n", value.data()[0]);
+
+            if (value.data()[0] == 1) {
                 digitalWrite(ledPin, HIGH);
             } else {
                 digitalWrite(ledPin, LOW);
@@ -43,11 +42,11 @@ private:
 public:
     void init(int ledPin) {
         // Create service with uuid
-        Serial.println("Creating RNT Service...");
+        DEBUG_MSG("Creating RNT Service...\n");
         pService =  MyBLEServer::getServer()->createService(RNT_SERVICE_UUID);
 
         // Create sensor characteristic with uuid
-        Serial.println("Creating RNT Fetch Characteristics...");
+        DEBUG_MSG("Creating RNT Fetch Characteristics...\n");
         pSensorCharacteristic = pService->createCharacteristic(
             RNT_SENSOR_CHARACTERISTIC_UUID,
             NIMBLE_PROPERTY::READ |
@@ -58,7 +57,7 @@ public:
 
         // Create led characteristic with uuid
         // Default properties are being used (READ | WRITE)
-        Serial.println("Creating RNT LED Characteristics...");
+        DEBUG_MSG("Creating RNT LED Characteristics...\n");
         pLedCharacteristic = pService->createCharacteristic(
             RNT_LED_CHARACTERISTIC_UUID,
             NIMBLE_PROPERTY::WRITE |
@@ -71,7 +70,7 @@ public:
         pLedCharacteristic->setCallbacks(ledCallback);
 
         // Start service
-        Serial.println("Start RNT service!");
+        DEBUG_MSG("Start RNT service!\n");
         pService->start();
 
         // Advertice service
@@ -79,14 +78,12 @@ public:
     }
     
     void update() {
-        Serial.println("(update)");
         static int value = 0;
 
         // notify changed value
         if (MyServerCallback::deviceConnected) {
             String str = String(value++);
-            Serial.print("New value notified: ");
-            Serial.println(value);
+            DEBUG_MSG("New value notified: %s\n", str.c_str());
             pSensorCharacteristic->notify((const uint8_t*)str.c_str(), str.length());
         }
     }

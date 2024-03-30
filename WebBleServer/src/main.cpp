@@ -4,7 +4,7 @@
 #include <RNTService.h>
 
 // const int buttonPin = 10;
-const int ledPin = 2;
+const int ledPin = 4;
 
 UniCom uniCom;
 RNTService rntService;

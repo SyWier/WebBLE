@@ -7,15 +7,15 @@ MyServerCallback::MyServerCallback(NimBLEServer *pServer) : pServer(pServer) {};
 
 void MyServerCallback::onAuthenticationComplete(ble_gap_conn_desc* desc) {
     deviceConnected = true;
-    Serial.println("Device Connected");
+    DEBUG_MSG("Device Connected\n");
 };
 
 void MyServerCallback::onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
-    Serial.println("Device disconnected.");
+    DEBUG_MSG("Device disconnected.\n");
     delay(500); // give the bluetooth stack the chance to get things ready
     pServer->startAdvertising(); // restart advertising
-    Serial.println("Start advertising");
+    DEBUG_MSG("Start advertising\n");
 }
 
 // BLE Server for Service handling
@@ -26,24 +26,24 @@ bool MyBLEServer::initialized = false;
 
 void MyBLEServer::init(const char *deviceName /*"ESP32"*/) {
     if(initialized) {
-        Serial.println("MyBLEServer: Already initialized!");
+        DEBUG_MSG("MyBLEServer: Already initialized!\n");
         return;
     }
     initialized = true;
 
-    Serial.println("Initializing MyBLEServer...");
+    DEBUG_MSG("Initializing MyBLEServer...\n");
 
     // Init NimBLE on device
     NimBLEDevice::init(deviceName);
 
     // Enable security
-    Serial.println("Enable security, PIN: 123456");
+    DEBUG_MSG("Enable security, PIN: 123456\n");
     NimBLEDevice::setSecurityAuth(true, true, true);
     NimBLEDevice::setSecurityPasskey(123456);
     NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
 
     // Create NimBLE server
-    Serial.println("Creating Server...");
+    DEBUG_MSG("Creating Server...\n");
     pServer = NimBLEDevice::createServer();
 
     // Set callback class
@@ -56,7 +56,7 @@ void MyBLEServer::init(const char *deviceName /*"ESP32"*/) {
 
 void MyBLEServer::start() {
     // Start Advertising
-    Serial.println("MyBLEServer: Start advertising!");
+    DEBUG_MSG("MyBLEServer: Start advertising!\n");
     pAdvertising->start();
 }
 

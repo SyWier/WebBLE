@@ -3,33 +3,35 @@
 // Unicom Callback
 void UniComCallback::onWrite(NimBLECharacteristic* pUniCharacteristic) {
     std::string value = pUniCharacteristic->getValue();
-    int msgType = static_cast<int>(value[0]);
     if(value.length() <= 0) {
-        Serial.print("Invalid message received. (Insufficient lenght.)");
+        DEBUG_MSG("Invalid message received. (Insufficient lenght.)\n");
         return;
     }
     if(!MyServerCallback::deviceConnected) {
         return;
     }
 
-    Serial.print("Message received: ");
-    Serial.println(msgType); // Print the integer value
+    int msgType = static_cast<int>(value[0]);
+
+    DEBUG_MSG("Message received: ");
+    DEBUG_MSG(String(msgType).c_str());
+    DEBUG_MSG("\n");
 
     switch(msgType) {
         case 1: 
-            Serial.println("Button A");
+            DEBUG_MSG("Sent value: Button A\n");
             pUniCharacteristic->setValue("Button A");
             break;
         case 2:
-            Serial.println("Button B");
+            DEBUG_MSG("Sent value: Button B\n");
             pUniCharacteristic->setValue("Button B");
             break;
         case 3:
-            Serial.println("Button C");
+            DEBUG_MSG("Sent value: Button C\n");
             pUniCharacteristic->setValue("Button C");
             break;
         default:
-            Serial.println("Unknown button");
+            DEBUG_MSG("Unknown button\n");
             return;
     }
 
@@ -38,11 +40,11 @@ void UniComCallback::onWrite(NimBLECharacteristic* pUniCharacteristic) {
 
 // BLE Universal communication
 void UniCom::init() {
-    Serial.println("Creating UniCom Service...");
+    DEBUG_MSG("Creating UniCom Service...\n");
     pService = MyBLEServer::getServer()->createService(UNI_SERVICE_UUID);
     
     // Create UniCom Characteristic with UUID
-    Serial.println("Creating UniCom Characteristics...");
+    DEBUG_MSG("Creating UniCom Characteristics...\n");
     pCharacteristic = pService->createCharacteristic(
         UNI_CHARACTERISTIC_UUID,
         NIMBLE_PROPERTY::READ   |
@@ -56,7 +58,7 @@ void UniCom::init() {
     pCharacteristic->setCallbacks(uniComCallback);
 
     // Start service
-    Serial.println("Start UniCom service!");
+    DEBUG_MSG("Start UniCom service!\n");
     pService->start();
 
     // Advertice service
