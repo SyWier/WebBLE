@@ -1,29 +1,32 @@
 #include <Arduino.h>
-//#include <EzBLE.h>
-#include <Web.h>
+#include <MyBLEServer.h>
+#include <UniCom.h>
+#include <RNTService.h>
 
-WebServer webServer;
+// const int buttonPin = 10;
+const int ledPin = 2;
 
-const int buttonPin = 10;
+UniCom uniCom;
+RNTService rntService;
 
 void setup() {
     Serial.begin(115200);
-    delay(7000);
+    // delay(7000);
 
-    // EzBLE EzBLE;
-    // EzBLE.Init();
-    // EzBLE.SetPacketValue("Hello BLE");
-    // EzBLE.Start();
+    MyBLEServer::init();
 
-    webServer.Init();
+    uniCom.init();
+    rntService.init(ledPin),
 
-    pinMode(buttonPin, INPUT);
+    MyBLEServer::start();
+
+    // pinMode(buttonPin, INPUT);
 }
 
 void loop() {
     // int val = digitalRead(buttonPin);
     // String str = "Button state: ";
     // Serial.println(str + val);
-    webServer.Update();
+    rntService.update();
     delay(1000);
 }
