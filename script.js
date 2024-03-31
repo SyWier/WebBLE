@@ -141,6 +141,7 @@ class WebBLE {
             characteristic.startNotifications();
             console.log("Notifications Started.");
             // Read current value
+            //! Exception! If the characteristics doesn't load fast enough, error will be generated!
             return characteristic.readValue();
         })
         .then(value => {
@@ -202,7 +203,12 @@ class WebBLE {
         .then(characteristic => {
             console.log("Characteristic discovered:", characteristic.uuid);
             this.bleReq.characteristicFound = characteristic;
+
+            //! Exception! If the characteristics (?) doesn't load fast enough, error will be generated!
+            // DOMexception
+            // event listener won't work
             characteristic.addEventListener('characteristicvaluechanged', this.handleReceived.bind(this));
+            
             characteristic.startNotifications();
             console.log("Notifications Started.");
         })
