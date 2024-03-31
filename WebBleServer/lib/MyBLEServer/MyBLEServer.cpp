@@ -37,9 +37,11 @@ void MyBLEServer::init(const char *deviceName /*"ESP32"*/) {
     NimBLEDevice::init(deviceName);
 
     // Enable security
-    DEBUG_MSG("Enable security, PIN: 123456\n");
+    // Password between [100.000, 999.999] ([100.000, 1.000.000[)
+    pinCode = random(000000, 999999);
+    DEBUG_MSG("Enable security, PIN: %06d\n", pinCode);
     NimBLEDevice::setSecurityAuth(true, true, true);
-    NimBLEDevice::setSecurityPasskey(123456);
+    NimBLEDevice::setSecurityPasskey(pinCode);
     NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
 
     // Create NimBLE server
@@ -62,3 +64,4 @@ void MyBLEServer::start() {
 
 NimBLEServer* MyBLEServer::getServer() { return pServer; }
 NimBLEAdvertising* MyBLEServer::getAdvertising() { return pAdvertising; }
+uint32_t MyBLEServer::getPinCode() { return pinCode; }

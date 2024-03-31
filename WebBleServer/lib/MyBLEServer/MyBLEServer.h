@@ -27,6 +27,7 @@ private:
     static NimBLEServer *pServer;
     static MyServerCallback *myServerCallback;
     static NimBLEAdvertising *pAdvertising;
+    static uint32_t pinCode;
     static bool initialized;
 
 public:
@@ -34,4 +35,5 @@ public:
     static void start();
     static NimBLEServer* getServer();
     static NimBLEAdvertising* getAdvertising();
+    static uint32_t getPinCode();
 };
