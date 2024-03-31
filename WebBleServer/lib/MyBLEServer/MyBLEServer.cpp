@@ -41,6 +41,10 @@ void MyBLEServer::init(const char *deviceName /*"ESP32"*/) {
     // Init NimBLE on device
     NimBLEDevice::init(deviceName);
 
+
+    // Set Maximum Transmission Unit (MTU)
+    // NimBLEDevice::setMTU(500);
+
     // Enable security
     pinCode = random(000000, 999999); // PIN between [100.000, 999.999]
     DEBUG_MSG("Enable security, PIN: %06d\n", pinCode);
