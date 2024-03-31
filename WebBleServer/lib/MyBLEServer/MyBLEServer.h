@@ -11,29 +11,32 @@
 // Calback for the WebBLe server
 class MyServerCallback: public NimBLEServerCallbacks {
 public:
-    static bool deviceConnected;
-    NimBLEServer *pServer;
-
-    MyServerCallback(NimBLEServer *pServer);
-
+    void onConnect(NimBLEServer* pServer);
+    void onDisconnect(NimBLEServer* pServer);
     void onAuthenticationComplete(ble_gap_conn_desc* desc);
-
-    void onDisconnect(BLEServer* pServer);
 };
 
 // BLE Server for Service handling
 class MyBLEServer {
 private:
     static NimBLEServer *pServer;
-    static MyServerCallback *myServerCallback;
     static NimBLEAdvertising *pAdvertising;
-    static uint32_t pinCode;
     static bool initialized;
+
+public:
+    static uint32_t pinCode;
+    static bool isConnected;
+    static bool isAuthenticated;
 
 public:
     static void init(const char *deviceName = "ESP32");
     static void start();
-    static NimBLEServer* getServer();
-    static NimBLEAdvertising* getAdvertising();
-    static uint32_t getPinCode();
+    static NimBLEService* createService(const char* uuid);
+    static void adverticeService(const char* uuid);
+
+    // static bool getPinCode();
+    // static bool isConnected();
+    // static NimBLEServer* getServer();
+    // static NimBLEAdvertising* getAdvertising();
+    // static uint32_t getPinCode();
 };

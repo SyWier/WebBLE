@@ -16,7 +16,6 @@ class UniCom {
 private:
     NimBLEService *pService;
     NimBLECharacteristic *pCharacteristic;
-    UniComCallback *uniComCallback;
 
 public:
     void init();

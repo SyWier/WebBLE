@@ -37,21 +37,18 @@ private:
     NimBLEService *pService;
     NimBLECharacteristic *pSensorCharacteristic;
     NimBLECharacteristic *pLedCharacteristic;
-    LedCallback *ledCallback;
 
 public:
     void init(int ledPin) {
         // Create service with uuid
         DEBUG_MSG("Creating RNT Service...\n");
-        pService =  MyBLEServer::getServer()->createService(RNT_SERVICE_UUID);
+        pService =  MyBLEServer::createService(RNT_SERVICE_UUID);
 
         // Create sensor characteristic with uuid
         DEBUG_MSG("Creating RNT Fetch Characteristics...\n");
         pSensorCharacteristic = pService->createCharacteristic(
             RNT_SENSOR_CHARACTERISTIC_UUID,
             NIMBLE_PROPERTY::READ |
-            NIMBLE_PROPERTY::READ_ENC |
-            NIMBLE_PROPERTY::READ_AUTHEN |
             NIMBLE_PROPERTY::NOTIFY
         );
 
@@ -59,29 +56,25 @@ public:
         // Default properties are being used (READ | WRITE)
         DEBUG_MSG("Creating RNT LED Characteristics...\n");
         pLedCharacteristic = pService->createCharacteristic(
-            RNT_LED_CHARACTERISTIC_UUID,
-            NIMBLE_PROPERTY::WRITE |
-            NIMBLE_PROPERTY::WRITE_ENC |
-            NIMBLE_PROPERTY::WRITE_AUTHEN
+            RNT_LED_CHARACTERISTIC_UUID
         );
 
         // Set callback class
-        ledCallback = new LedCallback(ledPin);
-        pLedCharacteristic->setCallbacks(ledCallback);
+        pLedCharacteristic->setCallbacks(new LedCallback(ledPin));
 
         // Start service
         DEBUG_MSG("Start RNT service!\n");
         pService->start();
 
         // Advertice service
-        MyBLEServer::getAdvertising()->addServiceUUID(RNT_SERVICE_UUID);
+        MyBLEServer::adverticeService(RNT_SERVICE_UUID);
     }
     
     void update() {
         static int value = 0;
 
         // notify changed value
-        if (MyServerCallback::deviceConnected) {
+        if (MyBLEServer::isConnected) {
             String str = String(value++);
             DEBUG_MSG("New value notified: %s\n", str.c_str());
             pSensorCharacteristic->notify((const uint8_t*)str.c_str(), str.length());

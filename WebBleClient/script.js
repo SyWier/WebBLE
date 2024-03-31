@@ -126,6 +126,9 @@ class WebBLE {
             this.initCounterFetch();
             this.initLedWrite();
         })
+        .catch(error => {
+            console.log('Error: ', error);
+        })
     }
 
     // Get Counter Characteristics and Enable Notifications

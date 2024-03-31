@@ -7,7 +7,8 @@ void UniComCallback::onWrite(NimBLECharacteristic* pUniCharacteristic) {
         DEBUG_MSG("Invalid message received. (Insufficient lenght.)\n");
         return;
     }
-    if(!MyServerCallback::deviceConnected) {
+    if(!MyBLEServer::isAuthenticated) {
+        DEBUG_MSG("Device is not authenticated!\n");
         return;
     }
 
@@ -35,32 +36,34 @@ void UniComCallback::onWrite(NimBLECharacteristic* pUniCharacteristic) {
             return;
     }
 
-    pUniCharacteristic->notify();
+    pUniCharacteristic->indicate();
 }
 
 // BLE Universal communication
 void UniCom::init() {
     DEBUG_MSG("Creating UniCom Service...\n");
-    pService = MyBLEServer::getServer()->createService(UNI_SERVICE_UUID);
-    
+    pService = MyBLEServer::createService(UNI_SERVICE_UUID);
+
     // Create UniCom Characteristic with UUID
     DEBUG_MSG("Creating UniCom Characteristics...\n");
     pCharacteristic = pService->createCharacteristic(
         UNI_CHARACTERISTIC_UUID,
-        NIMBLE_PROPERTY::READ   |
-        NIMBLE_PROPERTY::WRITE  |
-        NIMBLE_PROPERTY::NOTIFY |
+        NIMBLE_PROPERTY::READ |
+        NIMBLE_PROPERTY::READ_ENC |
+        NIMBLE_PROPERTY::READ_AUTHEN |
+        NIMBLE_PROPERTY::WRITE |
+        NIMBLE_PROPERTY::WRITE_ENC |
+        NIMBLE_PROPERTY::WRITE_AUTHEN |
         NIMBLE_PROPERTY::INDICATE
     );
 
     // Set callback class
-    uniComCallback = new UniComCallback();
-    pCharacteristic->setCallbacks(uniComCallback);
+    pCharacteristic->setCallbacks(new UniComCallback());
 
     // Start service
     DEBUG_MSG("Start UniCom service!\n");
     pService->start();
 
     // Advertice service
-    MyBLEServer::getAdvertising()->addServiceUUID(UNI_SERVICE_UUID);
+    MyBLEServer::adverticeService(UNI_SERVICE_UUID);
 }
