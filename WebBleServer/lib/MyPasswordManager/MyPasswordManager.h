@@ -1,14 +1,15 @@
 #include <UniCom.h>
 
 // Calback for the UniCom Characteristics
-class MyPasswordManager : public NimBLECharacteristicCallbacks {
+class MyPasswordManager : public UniComCallback {
 private:
     UniCom* uniCom;
 
 public:
-    MyPasswordManager(UniCom* uniCom);
-    void onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code);
-    void onWrite(NimBLECharacteristic* pCharacteristic);
+    ~MyPasswordManager();
+    void init();
+    void readValue(String value);
+    void typeDecoder(int type);
     void sendPassword();
     void sendUserInfo();
 };

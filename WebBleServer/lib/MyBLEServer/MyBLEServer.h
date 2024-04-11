@@ -21,10 +21,10 @@ class MyBLEServer {
 private:
     static NimBLEServer *pServer;
     static NimBLEAdvertising *pAdvertising;
-    static bool initialized;
 
 public:
     static uint32_t pinCode;
+    static bool isInitialized;
     static bool isConnected;
     static bool isAuthenticated;
 

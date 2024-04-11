@@ -1,7 +1,6 @@
 #include <MyBLEServer.h>
 
 // Calback for the WebBLe server
-
 void MyServerCallback::onConnect(NimBLEServer* pServer) {
     MyBLEServer::isConnected = true;
     DEBUG_MSG("Device Connected\n");
@@ -27,14 +26,13 @@ NimBLEAdvertising* MyBLEServer::pAdvertising = nullptr;
 uint32_t MyBLEServer::pinCode = 0;
 bool MyBLEServer::isConnected = false;
 bool MyBLEServer::isAuthenticated = false;
-bool MyBLEServer::initialized = false;
+bool MyBLEServer::isInitialized = false;
 
 void MyBLEServer::init(const char *deviceName /*"ESP32"*/) {
-    if(initialized) {
+    if(isInitialized) {
         DEBUG_MSG("MyBLEServer: Already initialized!\n");
         return;
     }
-    initialized = true;
 
     DEBUG_MSG("Initializing MyBLEServer...\n");
 
@@ -61,6 +59,9 @@ void MyBLEServer::init(const char *deviceName /*"ESP32"*/) {
 
     // Get advertising handle
     pAdvertising = NimBLEDevice::getAdvertising();
+
+    // Flag initialized state
+    isInitialized = true;
 }
 
 void MyBLEServer::start() {

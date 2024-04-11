@@ -1,26 +1,16 @@
 #include <MyPasswordManager.h>
 
 // Unicom Callback
-MyPasswordManager::MyPasswordManager(UniCom* uniCom) : uniCom(uniCom) {}
-
-void MyPasswordManager::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code) {
-    String str;
-    switch(s) {
-        case SUCCESS_INDICATE: str = "SUCCESS_INDICATE"; break;
-        case SUCCESS_NOTIFY: str = "SUCCESS_NOTIFY"; break;
-        case ERROR_INDICATE_DISABLED: str = "ERROR_INDICATE_DISABLED"; break;
-        case ERROR_NOTIFY_DISABLED: str = "ERROR_NOTIFY_DISABLED"; break;
-        case ERROR_GATT: str = "ERROR_GATT"; break;
-        case ERROR_NO_CLIENT: str = "ERROR_NO_CLIENT"; break;
-        case ERROR_INDICATE_TIMEOUT: str = "ERROR_INDICATE_TIMEOUT"; break;
-        case ERROR_INDICATE_FAILURE: str = "ERROR_INDICATE_FAILURE"; break;
-        default: str = "Unkown status"; break;
-    }
-    DEBUG_MSG("Status: %s.\n", str.c_str());
+MyPasswordManager::~MyPasswordManager() {
+    delete uniCom;
 }
 
-void MyPasswordManager::onWrite(NimBLECharacteristic* pCharacteristic) {
-    std::string value = pCharacteristic->getValue();
+void MyPasswordManager::init() {
+    DEBUG_MSG("Initializing MyPasswordManager...\n");
+    uniCom = new UniCom(this);
+}
+
+void MyPasswordManager::readValue(String value) {
     if(value.length() <= 0) {
         DEBUG_MSG("Invalid message received. (Insufficient lenght.)\n");
         return;
@@ -36,14 +26,16 @@ void MyPasswordManager::onWrite(NimBLECharacteristic* pCharacteristic) {
     DEBUG_MSG(String(msgType).c_str());
     DEBUG_MSG("\n");
 
-    String val;
+    typeDecoder(msgType);
+}
 
-    switch(msgType) {
+void MyPasswordManager::typeDecoder(int type) {
+    String val;
+    switch(type) {
         case 1: 
             val = "Button A";
             DEBUG_MSG("Sent value: %s\n", val.c_str());
-            pCharacteristic->indicate(val);
-            // pCharacteristic->setValue();
+            uniCom->sendString(val);
             break;
         case 2:
             DEBUG_MSG("Sending user info...\n");

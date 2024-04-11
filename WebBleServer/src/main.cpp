@@ -7,7 +7,7 @@
 // const int buttonPin = 10;
 const int ledPin = 4;
 
-UniCom uniCom;
+MyPasswordManager myPasswordManager;
 RNTService rntService;
 
 
@@ -18,8 +18,8 @@ void setup() {
 
     MyBLEServer::init();
 
-    uniCom.init(new MyPasswordManager(&uniCom));
-    rntService.init(ledPin),
+    myPasswordManager.init();
+    rntService.init(ledPin);
 
     MyBLEServer::start();
 
