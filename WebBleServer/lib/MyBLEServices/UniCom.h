@@ -13,27 +13,32 @@ public:
     virtual void readValue(String value);
 };
 
-// UniCom callbacks called by Nimble
-class UniComNimbleCallback : public NimBLECharacteristicCallbacks {
-private:
-    UniComCallback* callback;
-
-public:
-    void addCallback(UniComCallback* uniComCallback);
-    void onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code);
-    void onWrite(NimBLECharacteristic* pCharacteristic);
-};
-
 // Universal Communication
-class UniCom {
+class UniCom : public NimBLECharacteristicCallbacks{
 private:
-    UniComNimbleCallback *uniComNimbleCallback;
+    enum {ATT_HEADER = 3}; // ATT header size for write, read, notification, indication
+    const char *pStr;
+    int str_pos;
+    int len;
+    int att_mtu;
+    int att_data;
+    bool isInProgress;
+    String buffer;
+
+private:
+    UniComCallback* uniComCallback;
     NimBLEService *pService;
     NimBLECharacteristic *pCharacteristic;
 
 public:
     UniCom(UniComCallback* uniComCallback = nullptr);
-    void init(UniComCallback* uniComCallback = nullptr);
+    void init();
+    
+    void sendPacket();
     void sendString(String &str);
     void sendJSON(JsonDocument &json);
+    
+    // Nimble callback functions
+    void onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code);
+    void onWrite(NimBLECharacteristic* pCharacteristic);
 };

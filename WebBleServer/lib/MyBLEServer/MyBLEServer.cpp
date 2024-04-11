@@ -4,6 +4,7 @@
 void MyServerCallback::onConnect(NimBLEServer* pServer) {
     MyBLEServer::isConnected = true;
     DEBUG_MSG("Device Connected\n");
+    DEBUG_MSG("MTU Size: %d\n", NimBLEDevice::getMTU());
 }
 
 void MyServerCallback::onDisconnect(NimBLEServer* pServer) {
@@ -39,9 +40,9 @@ void MyBLEServer::init(const char *deviceName /*"ESP32"*/) {
     // Init NimBLE on device
     NimBLEDevice::init(deviceName);
 
-
     // Set Maximum Transmission Unit (MTU)
-    // NimBLEDevice::setMTU(500);
+    NimBLEDevice::setMTU(103);
+    // NimBLEDevice::setMTU(BLE_ATT_MTU_MAX);
 
     // Enable security
     pinCode = random(000000, 999999); // PIN between [100.000, 999.999]

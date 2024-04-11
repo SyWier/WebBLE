@@ -1,14 +1,14 @@
 #include <UniCom.h>
-
-// BLE UniCom Callback functions
-void UniComNimbleCallback::addCallback(UniComCallback* uniComCallback) {
-    this->callback = uniComCallback;
-}
-
-void UniComNimbleCallback::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code) {
+// Universal communication callbacks
+void UniCom::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code) {
     String str;
     switch(s) {
-        case SUCCESS_INDICATE: str = "SUCCESS_INDICATE"; break;
+        case SUCCESS_INDICATE:
+            if(isInProgress) {
+                sendPacket();
+            }
+            str = "SUCCESS_INDICATE";
+            break;
         case SUCCESS_NOTIFY: str = "SUCCESS_NOTIFY"; break;
         case ERROR_INDICATE_DISABLED: str = "ERROR_INDICATE_DISABLED"; break;
         case ERROR_NOTIFY_DISABLED: str = "ERROR_NOTIFY_DISABLED"; break;
@@ -21,16 +21,27 @@ void UniComNimbleCallback::onStatus(NimBLECharacteristic* pCharacteristic, Statu
     DEBUG_MSG("Status: %s.\n", str.c_str());
 }
 
-void UniComNimbleCallback::onWrite(NimBLECharacteristic* pCharacteristic) {
-    callback->readValue(pCharacteristic->getValue());
+void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
+    uniComCallback->readValue(pCharacteristic->getValue());
 }
 
-// BLE Universal communication
+// Universal communication
 UniCom::UniCom(UniComCallback* uniComCallback /*nullptr*/) {
-    init(uniComCallback);
+    this->uniComCallback = uniComCallback;
+    pService = nullptr;
+    pCharacteristic = nullptr;
+
+    att_mtu = NimBLEDevice::getMTU();
+    att_data = att_mtu - ATT_HEADER;
+    isInProgress = false;
+    
+    if(uniComCallback == nullptr)
+      DEBUG_MSG("uniComCallback pointer is null :(\n");
+
+    init();
 }
 
-void UniCom::init(UniComCallback* uniComCallback /*nullptr*/) {
+void UniCom::init() {
     DEBUG_MSG("Initializing UniCom...\n");
     if(!MyBLEServer::isInitialized) {
         DEBUG_MSG("Error: MyBLEServer hasn't started yet!\n");
@@ -60,9 +71,7 @@ void UniCom::init(UniComCallback* uniComCallback /*nullptr*/) {
     );
 
     // Set callback class
-    uniComNimbleCallback = new UniComNimbleCallback();
-    uniComNimbleCallback->addCallback(uniComCallback);
-    pCharacteristic->setCallbacks(uniComNimbleCallback);
+    pCharacteristic->setCallbacks(this);
 
     // Start service
     DEBUG_MSG("Start UniCom service!\n");
@@ -71,10 +80,32 @@ void UniCom::init(UniComCallback* uniComCallback /*nullptr*/) {
     // Advertice service
     MyBLEServer::adverticeService(UNI_SERVICE_UUID);
 }
+void UniCom::sendPacket() {
+    // Need to send out the string + att header (3 byte) in each packet
+    DEBUG_MSG("Sending packet...\n");
+    if(str_pos + att_data < len) {
+        pCharacteristic->indicate((uint8_t*)(pStr + str_pos), att_mtu);
+        str_pos += att_data;
+    } else {
+        DEBUG_MSG("Lasts packet!\n");
+        pCharacteristic->indicate((uint8_t*)(pStr + str_pos), len-str_pos);
+        isInProgress = false;
+    }
+}
 
 void UniCom::sendString(String &str) {
     DEBUG_MSG("Sending String...\n");
-    pCharacteristic->indicate(str);
+    if(isInProgress) {
+        DEBUG_MSG("Transaction is already in progress!\n");
+        return;
+    }
+    isInProgress = true;
+    
+    pStr = str.c_str();
+    str_pos = 0;
+    len = str.length();
+
+    sendPacket();
 }
 
 void UniCom::sendJSON(JsonDocument &json) {
