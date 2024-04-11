@@ -7,6 +7,7 @@ private:
 
 public:
     MyPasswordManager(UniCom* uniCom);
+    void onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code);
     void onWrite(NimBLECharacteristic* pCharacteristic);
     void sendPassword();
     void sendUserInfo();
