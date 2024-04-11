@@ -1,28 +1,28 @@
 class WebBLE {
     constructor() {
         // Variables to Handle Bluetooth
-        this.bleHandle = {
-            bleServer : null,
-            bleServiceFound : null,
-            sensorCharacteristicFound : null,
-            ledCharacteristicFound : null,
-        };
-
-        // Define BLE Device Specs
-        this.bleSpecs = {
+        this.ble = {
             deviceName :'ESP32',
-            bleService : '19b10000-e8f2-537e-4f6c-d104768a1214',
-            sensorCharacteristic: '19b10001-e8f2-537e-4f6c-d104768a1214',
-            ledCharacteristic : '19b10002-e8f2-537e-4f6c-d104768a1214',
+            device : null,
+            server : null,
         };
 
-        // Request and Response
-        this.bleReq = {
-            service : '19b20000-e8f2-537e-4f6c-d104768a1214',
-            requestChar : '19b20001-e8f2-537e-4f6c-d104768a1214',
-            server : null,
-            serviceFound : null,
-            characteristicFound : null,
+        // RNT service
+        this.rnt = {
+            serviceUUID : '19b10000-e8f2-537e-4f6c-d104768a1214',
+            service : null,
+            counterCharUUID: '19b10001-e8f2-537e-4f6c-d104768a1214',
+            counterChar : null,
+            ledCharUUID : '19b10002-e8f2-537e-4f6c-d104768a1214',
+            ledChar : null,
+        };
+
+        // UniCom service
+        this.uniCom = {
+            serviceUUID : '19b20000-e8f2-537e-4f6c-d104768a1214',
+            service : null,
+            charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
+            char : null,
         };
 
         this.getDomElements();
@@ -79,7 +79,7 @@ class WebBLE {
     }
 
     isBleConnected() {
-        if(this.bleHandle.bleServer && this.bleHandle.bleServer.connected) {
+        if(this.ble.server && this.ble.server.connected) {
             return true;
         } else {
             console.error ("Bluetooth is not connected.");
@@ -89,101 +89,94 @@ class WebBLE {
     }
 
     // Connect to BLE Device
-    connectToDevice(){
+    async connectToDevice(){
         if(!this.isWebBluetoothEnabled()){
             return false;
         }
 
-        console.log('Initializing Bluetooth...');
-        navigator.bluetooth.requestDevice({
-            filters: [{namePrefix: this.bleSpecs.deviceName}],
-            //filters: [{name: this.bleSpecs.deviceName}],
-            optionalServices: [this.bleSpecs.bleService, this.bleReq.service]
-        })
-        .then(device => {
-            console.log('Device Selected:', device.name);
-            this.dom.bleStateContainer.innerHTML = 'Connected to device ' + device.name;
+        try {
+            console.log('Initializing Bluetooth...');
+            this.ble.device = await navigator.bluetooth.requestDevice({
+                filters: [{namePrefix: this.ble.deviceName}],
+                //filters: [{name: this.rnt.deviceName}],
+                optionalServices: [this.rnt.serviceUUID, this.uniCom.serviceUUID]
+            });
+            console.log('Device Selected:', this.ble.device.name);
+    
+            this.dom.bleStateContainer.innerHTML = 'Connected to device ' + this.ble.device.name;
             this.dom.bleStateContainer.style.color = "#24af37";
-            device.addEventListener('gattservicedisconnected', this.onDisconnected.bind(this));
-            return device.gatt.connect();
-        })
-        .then(gattServer => {
+            this.ble.device.addEventListener('gattservicedisconnected', this.onDisconnected.bind(this));
+    
+            this.ble.server = await this.ble.device.gatt.connect();
             console.log("Connected to GATT Server");
-            this.bleHandle.bleServer = gattServer;
+    
             this.getRandomNerdTutorialService();
             this.getUniComService();
-        })
-        .catch(error => {
+        } catch(error) {
             console.log('Error: ', error);
-        })
+        }
     }
 
-    getRandomNerdTutorialService() {
-        this.bleHandle.bleServer.getPrimaryService(this.bleSpecs.bleService)
-        .then(service => {
-            console.log("Service discovered:", service.uuid);
-            this.bleHandle.bleServiceFound = service;
-            this.initCounterFetch();
-            this.initLedWrite();
-        })
-        .catch(error => {
+    async getRandomNerdTutorialService() {
+        try {
+            this.rnt.service = await this.ble.server.getPrimaryService(this.rnt.serviceUUID)
+            console.log("Service discovered:", this.rnt.service.uuid);
+            this.initRNTcounter();
+            this.initRNTled();
+        } catch(error) {
             console.log('Error: ', error);
-        })
+        }
     }
 
     // Get Counter Characteristics and Enable Notifications
-    initCounterFetch() {
-        this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.sensorCharacteristic)
-        .then(characteristic => {
-            console.log("Characteristic discovered:", characteristic.uuid);
-            this.bleHandle.sensorCharacteristicFound = characteristic;
-            characteristic.addEventListener('characteristicvaluechanged', this.handleFetch.bind(this));
-            characteristic.startNotifications();
+    async initRNTcounter() {
+        try {
+            this.rnt.counterChar = await this.rnt.service.getCharacteristic(this.rnt.counterCharUUID);
+            console.log("Characteristic discovered:", this.rnt.counterChar.uuid);
+            this.rnt.counterChar.addEventListener('characteristicvaluechanged', this.handleCounter.bind(this));
+            this.rnt.counterChar.startNotifications();
             console.log("Notifications Started.");
+    
             // Read current value
             //! Exception! If the characteristics doesn't load fast enough, error will be generated!
-            return characteristic.readValue();
-        })
-        .then(value => {
+            let value = await characteristic.readValue();
             console.log("Read value: ", value);
             const decodedValue = new TextDecoder().decode(value);
             console.log("Decoded value: ", decodedValue);
             this.dom.retrievedValue.innerHTML = decodedValue;
             this.dom.timestampContainer.innerHTML = getDateTime();
-        })
-        .catch(error => {
+        } catch(error) {
             console.log('Error: ', error);
-        })
+        }
     }
 
-    handleFetch(event){
+    handleCounter(event){
         const newValueReceived = new TextDecoder().decode(event.target.value);
         console.log("Characteristic value changed: ", newValueReceived);
         this.dom.retrievedValue.innerHTML = newValueReceived;
         this.dom.timestampContainer.innerHTML = getDateTime();
     }
 
-    initLedWrite() {
-        this.bleHandle.bleServiceFound.getCharacteristic(this.bleSpecs.ledCharacteristic)
-        .then(characteristic => {
-            console.log("Found the LED characteristic: ", characteristic.uuid);
-            this.bleHandle.ledCharacteristicFound = characteristic;
-        })
-        .catch(error => {
+    async initRNTled() {
+        try {
+            this.rnt.ledChar = await this.rnt.service.getCharacteristic(this.rnt.ledCharUUID)
+            console.log("Found the LED characteristic: ", this.rnt.ledChar.uuid);
+        } catch(error) {
             console.error("Error: ", error);
-        });
+        }
     }
 
+    // RNT led write function
     writeOnCharacteristic(value){
         if(!this.isBleConnected()) {
             return false;
         }
-        if(!this.bleHandle.bleServiceFound) {
+        if(!this.rnt.ledChar) {
             return false;
         }
 
         const data = new Uint8Array([value]);
-        this.bleHandle.ledCharacteristicFound.writeValue(data)
+        this.rnt.ledChar.writeValue(data)
         .then(() => {
             this.dom.latestValueSent.innerHTML = value;
             console.log("Value written to LED characteristic:", value);
@@ -193,28 +186,18 @@ class WebBLE {
         });
     }
 
-    getUniComService() {
-        this.bleHandle.bleServer.getPrimaryService(this.bleReq.service)
-        .then(service => {
-            console.log("Service discovered:", service.uuid);
-            this.bleReq.serviceFound = service;
-            return service.getCharacteristic(this.bleReq.requestChar);
-        })
-        .then(characteristic => {
-            console.log("Characteristic discovered:", characteristic.uuid);
-            this.bleReq.characteristicFound = characteristic;
-
-            //! Exception! If the characteristics (?) doesn't load fast enough, error will be generated!
-            // DOMexception
-            // event listener won't work
-            characteristic.addEventListener('characteristicvaluechanged', this.handleReceived.bind(this));
-            
-            characteristic.startNotifications();
+    async getUniComService() {
+        try {
+            this.uniCom.service = await this.ble.server.getPrimaryService(this.uniCom.serviceUUID);
+            console.log("Service discovered:", this.uniCom.service.uuid);
+            this.uniCom.char = await this.uniCom.service.getCharacteristic(this.uniCom.charUUID);
+            console.log("Characteristic discovered:", this.uniCom.char.uuid);
+            this.uniCom.char.addEventListener('characteristicvaluechanged', this.handleReceived.bind(this));
+            this.uniCom.char.startNotifications();
             console.log("Notifications Started.");
-        })
-        .catch(error => {
+        } catch(error) {
             console.error("Error: ", error);
-        });
+        }
     }
     
     handleReceived(event) {
@@ -227,12 +210,12 @@ class WebBLE {
         if(!this.isBleConnected()) {
             return false;
         }
-        if(!this.bleReq.serviceFound) {
+        if(!this.uniCom.char) {
             return false;
         }
 
         const data = new Uint8Array([value]);
-        this.bleReq.characteristicFound.writeValue(data)
+        this.uniCom.char.writeValue(data)
         .then(() => {
             console.log("Requested sent. Value:", value);
         })
@@ -248,11 +231,11 @@ class WebBLE {
         }
 
         console.log("Disconnect Device.");
-        if(this.bleHandle.sensorCharacteristicFound) {
-            this.bleHandle.sensorCharacteristicFound.stopNotifications()
+        if(this.rnt.counterChar) {
+            this.rnt.counterChar.stopNotifications()
                 .then(() => {
                     console.log("Notifications Stopped");
-                    return this.bleHandle.bleServer.disconnect();
+                    return this.ble.server.disconnect();
                 })
                 .then(() => {
                     console.log("Device Disconnected");
