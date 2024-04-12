@@ -21,12 +21,12 @@ private:
             UNICOM_HEADER = 1,
             PACKET_HEADER = ATT_HEADER + UNICOM_HEADER,
     };
-    String buffer;
-    int str_pos;
-    int len;
     int att_mtu;
     int att_data;
     int packet_size;
+
+    String buffer;
+    int str_pos;
     bool isInProgress;
 
 private:

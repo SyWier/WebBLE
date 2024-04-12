@@ -22,7 +22,8 @@ void UniCom::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code)
 }
 
 void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
-    uniComCallback->readValue(pCharacteristic->getValue());
+    if(uniComCallback != nullptr)
+        uniComCallback->readValue(pCharacteristic->getValue());
 }
 
 // Universal communication
@@ -35,9 +36,6 @@ UniCom::UniCom(UniComCallback* uniComCallback /*nullptr*/) {
     att_data = att_mtu - ATT_HEADER - UNICOM_HEADER;
     packet_size = att_data + UNICOM_HEADER;
     isInProgress = false;
-    
-    if(uniComCallback == nullptr)
-      DEBUG_MSG("uniComCallback pointer is null :(\n");
 
     init();
 }
@@ -84,7 +82,7 @@ void UniCom::init() {
 void UniCom::sendPacket() {
     // Need to send out the string + att header (3 byte) in each packet
     DEBUG_MSG("Sending packet...\n");
-    if(str_pos + att_data < len) {
+    if(str_pos + att_data < buffer.length()) {
         String str = "P" + buffer.substring(str_pos, str_pos + att_data);
         pCharacteristic->indicate(str);
         str_pos += att_data;
@@ -107,7 +105,6 @@ void UniCom::sendString(String &str) {
 
     buffer = str;
     str_pos = 0;
-    len = str.length();
 
     sendPacket();
 }
