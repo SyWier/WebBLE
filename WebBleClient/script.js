@@ -139,7 +139,7 @@ class WebBLE {
     
             // Read current value
             //! Exception! If the characteristics doesn't load fast enough, error will be generated!
-            let value = await characteristic.readValue();
+            let value = await this.rnt.counterChar.readValue();
             console.log("Read value: ", value);
             const decodedValue = new TextDecoder().decode(value);
             console.log("Decoded value: ", decodedValue);
