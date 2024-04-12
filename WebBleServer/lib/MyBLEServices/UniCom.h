@@ -16,14 +16,18 @@ public:
 // Universal Communication
 class UniCom : public NimBLECharacteristicCallbacks{
 private:
-    enum {ATT_HEADER = 3}; // ATT header size for write, read, notification, indication
-    const char *pStr;
+    enum {
+            ATT_HEADER = 3, // ATT header size for write, read, notification, indication
+            UNICOM_HEADER = 1,
+            PACKET_HEADER = ATT_HEADER + UNICOM_HEADER,
+    };
+    String buffer;
     int str_pos;
     int len;
     int att_mtu;
     int att_data;
+    int packet_size;
     bool isInProgress;
-    String buffer;
 
 private:
     UniComCallback* uniComCallback;

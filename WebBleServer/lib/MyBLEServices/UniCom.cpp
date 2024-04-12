@@ -32,7 +32,8 @@ UniCom::UniCom(UniComCallback* uniComCallback /*nullptr*/) {
     pCharacteristic = nullptr;
 
     att_mtu = NimBLEDevice::getMTU();
-    att_data = att_mtu - ATT_HEADER;
+    att_data = att_mtu - ATT_HEADER - UNICOM_HEADER;
+    packet_size = att_data + UNICOM_HEADER;
     isInProgress = false;
     
     if(uniComCallback == nullptr)
@@ -84,11 +85,14 @@ void UniCom::sendPacket() {
     // Need to send out the string + att header (3 byte) in each packet
     DEBUG_MSG("Sending packet...\n");
     if(str_pos + att_data < len) {
-        pCharacteristic->indicate((uint8_t*)(pStr + str_pos), att_mtu);
+        String str = "P" + buffer.substring(str_pos, str_pos + att_data);
+        pCharacteristic->indicate(str);
         str_pos += att_data;
     } else {
         DEBUG_MSG("Lasts packet!\n");
-        pCharacteristic->indicate((uint8_t*)(pStr + str_pos), len-str_pos);
+        String str = "X" + buffer.substring(str_pos, str_pos + att_data);
+        pCharacteristic->indicate(str);
+        buffer.clear();
         isInProgress = false;
     }
 }
@@ -100,8 +104,8 @@ void UniCom::sendString(String &str) {
         return;
     }
     isInProgress = true;
-    
-    pStr = str.c_str();
+
+    buffer = str;
     str_pos = 0;
     len = str.length();
 
