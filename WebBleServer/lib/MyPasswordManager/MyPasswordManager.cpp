@@ -21,16 +21,15 @@ void MyPasswordManager::readValue(String value) {
         return;
     }
 
-    int msgType = static_cast<int>(value[0]);
+    DEBUG_MSG("Message received: %s\n", value.c_str());
 
-    DEBUG_MSG("Message received: ");
-    DEBUG_MSG(String(msgType).c_str());
-    DEBUG_MSG("\n");
+    int msgType = static_cast<int>(value[0]);
 
     typeDecoder(msgType);
 }
 
 void MyPasswordManager::typeDecoder(int type) {
+    DEBUG_MSG("Type: %d\n", type);
     String val;
     switch(type) {
         case 1: 
