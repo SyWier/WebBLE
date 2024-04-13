@@ -23,6 +23,7 @@ class WebBLE {
             service : null,
             charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
             char : null,
+            buffer : '',
         };
 
         this.getDomElements();
@@ -203,7 +204,16 @@ class WebBLE {
     handleReceived(event) {
         const received = new TextDecoder().decode(event.target.value);
         console.log("Received value: ", received);
-        this.btn.response.innerHTML = received;
+        const msgType = received.charAt(0);
+        const data = received.slice(1 - received.length);
+        if(msgType === 'P') {
+            this.uniCom.buffer += data
+            this.btn.response.innerHTML = 'In progress...';
+        } else if(msgType === 'X') {
+            this.uniCom.buffer += data
+            this.btn.response.innerHTML = this.uniCom.buffer;
+            this.uniCom.buffer = '';
+        }
     }
 
     requestData(value) {
