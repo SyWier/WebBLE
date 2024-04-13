@@ -216,7 +216,7 @@ class WebBLE {
         }
     }
 
-    requestData(value) {
+    async requestData(value) {
         if(!this.isBleConnected()) {
             return false;
         }
@@ -225,13 +225,18 @@ class WebBLE {
         }
 
         const data = new Uint8Array([value]);
-        this.uniCom.char.writeValue(data)
-        .then(() => {
+        const str = new TextEncoder().encode("11111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122");
+        console.log("Encoded string: ", str);
+        try {
+            await this.uniCom.char.writeValue(data)
             console.log("Requested sent. Value:", value);
-        })
-        .catch(error => {
+            await this.uniCom.char.writeValue(str);
+            await this.uniCom.char.writeValue(str);
+            await this.uniCom.char.writeValue(str);
+            console.log("Spam BLE server with strings :)");
+        } catch(error) {
             console.error("Error requesting data: ", error);
-        });
+        }
 
     }
 
