@@ -23,9 +23,17 @@ public:
             DEBUG_MSG("LED Characteristic event, written: %d\n", value.data()[0]);
 
             if (value.data()[0] == 1) {
+                #ifdef ESP32_S3_DEVKITC
+                neopixelWrite(RGB_BUILTIN, RGB_BRIGHTNESS, 0, 0);
+                #else
                 digitalWrite(ledPin, HIGH);
+                #endif
             } else {
+                #ifdef ESP32_S3_DEVKITC
+                neopixelWrite(RGB_BUILTIN, 0, 0, 0);
+                #else
                 digitalWrite(ledPin, LOW);
+                #endif
             }
         }
     }
