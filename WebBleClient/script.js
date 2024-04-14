@@ -202,18 +202,29 @@ class WebBLE {
     }
     
     handleReceived(event) {
-        const received = new TextDecoder().decode(event.target.value);
+        let received = new TextDecoder().decode(event.target.value);
         console.log("Received value: ", received);
-        const msgType = received.charAt(0);
-        const data = received.slice(1 - received.length);
-        if(msgType === 'P') {
-            this.uniCom.buffer += data
-            this.btn.response.innerHTML = 'In progress...';
-        } else if(msgType === 'X') {
-            this.uniCom.buffer += data
-            this.btn.response.innerHTML = this.uniCom.buffer;
-            this.uniCom.buffer = '';
+        received = this.unpack(received);
+        switch(received.type) {
+            case 'P':
+                this.uniCom.buffer += received.data;
+                this.btn.response.innerHTML = 'In progress...';
+                break;
+            case 'X':
+                this.uniCom.buffer += received.data
+                this.btn.response.innerHTML = this.uniCom.buffer;
+                this.uniCom.buffer = '';
+                break;
+            default:
+                console.log("Error: Unknown packet header!");
         }
+    }
+
+    unpack(packet) {
+        return {
+            type : packet.charAt(0),
+            data : packet.slice(1 - packet.length)
+        };
     }
 
     async requestData(value) {
