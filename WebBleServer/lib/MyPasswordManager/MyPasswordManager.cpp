@@ -10,7 +10,7 @@ void MyPasswordManager::init() {
     uniCom = new UniCom(this);
 }
 
-void MyPasswordManager::readValue(String value) {
+void MyPasswordManager::readValue(String &value) {
     DEBUG_MSG("Read value...\n");
     if(value.length() <= 0) {
         DEBUG_MSG("Invalid message received. (Insufficient lenght.)\n");

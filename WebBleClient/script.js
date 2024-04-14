@@ -5,6 +5,7 @@ class WebBLE {
             deviceName :'ESP32',
             device : null,
             server : null,
+            att_data : 497, // Max MTU - Max ATT Header = 512 - 15 = 497
         };
 
         // RNT service
@@ -24,6 +25,7 @@ class WebBLE {
             charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
             char : null,
             buffer : '',
+            packet_data : this.ble.att_data - 1, // UniCom Header size is 1
         };
 
         this.getDomElements();
@@ -200,7 +202,14 @@ class WebBLE {
             console.error("Error: ", error);
         }
     }
-    
+
+    unpack(packet) {
+        return {
+            type : packet.charAt(0),
+            data : packet.slice(1 - packet.length)
+        };
+    }
+
     handleReceived(event) {
         let received = new TextDecoder().decode(event.target.value);
         console.log("Received value: ", received);
@@ -220,11 +229,26 @@ class WebBLE {
         }
     }
 
-    unpack(packet) {
-        return {
-            type : packet.charAt(0),
-            data : packet.slice(1 - packet.length)
-        };
+    pack(str, pos, size) {
+        if(pos + size < str.length) {
+            return "O" + str.substr(pos, size);
+        } else {
+            return "X" + str.substr(pos, size);
+        }
+    }
+
+    async sendString(string) {
+        let pos = 0;
+        // let data_size = this.uniCom.packet_data;
+        let data_size = 100;
+        let segment;
+
+        while(pos <= string.length) {
+            console.log("Sending packet...");
+            segment = this.pack(string, pos, data_size);
+            pos += data_size;
+            await this.uniCom.char.writeValue(new TextEncoder().encode(segment));
+        }
     }
 
     async requestData(value) {
@@ -235,16 +259,12 @@ class WebBLE {
             return false;
         }
 
-        const data = new Uint8Array([value]);
-        const str = new TextEncoder().encode("11111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122");
-        console.log("Encoded string: ", str);
+        const str = "1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000";
         try {
-            await this.uniCom.char.writeValue(data)
-            console.log("Requested sent. Value:", value);
-            await this.uniCom.char.writeValue(str);
-            await this.uniCom.char.writeValue(str);
-            await this.uniCom.char.writeValue(str);
-            console.log("Spam BLE server with strings :)");
+            console.log("Send Value:", value);
+            await this.sendString(String.fromCharCode(value));
+            console.log("Send string: ", str);
+            await this.sendString(str);
         } catch(error) {
             console.error("Error requesting data: ", error);
         }

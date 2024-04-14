@@ -22,8 +22,23 @@ void UniCom::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code)
 }
 
 void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
-    if(uniComCallback != nullptr)
-        uniComCallback->readValue(pCharacteristic->getValue());
+    if(uniComCallback == nullptr)
+        return;
+
+    String str = pCharacteristic->getValue();
+    char type = str[0];
+    switch(type) {
+        case 'O':
+            inBuffer += str.substring(1);
+            break;
+        case 'X':
+            inBuffer += str.substring(1);
+            uniComCallback->readValue(inBuffer);
+            inBuffer.clear();
+            break;
+        default:
+            DEBUG_MSG("Unknown packet type.\n");
+    }
 }
 
 // Universal communication
@@ -33,8 +48,9 @@ UniCom::UniCom(UniComCallback* uniComCallback /*nullptr*/) {
     pCharacteristic = nullptr;
 
     att_mtu = NimBLEDevice::getMTU();
-    att_data = att_mtu - ATT_HEADER - UNICOM_HEADER;
-    packet_size = att_data + UNICOM_HEADER;
+    att_data = att_mtu - ATT_HEADER;
+    packet_data = att_data - UNICOM_HEADER;
+    packet_size = packet_data + UNICOM_HEADER;
     isInProgress = false;
 
     init();
@@ -82,13 +98,14 @@ void UniCom::init() {
 void UniCom::sendPacket() {
     // Need to send out the string + att header (3 byte) in each packet
     DEBUG_MSG("Sending packet...\n");
-    if(str_pos + att_data < buffer.length()) {
-        String str = "O" + buffer.substring(str_pos, str_pos + att_data);
+    if(str_pos + packet_data < buffer.length()) {
+        String str = "O" + buffer.substring(str_pos, str_pos + packet_data);
+        str_pos += packet_data;
         pCharacteristic->indicate(str);
-        str_pos += att_data;
     } else {
         DEBUG_MSG("Lasts packet!\n");
-        String str = "X" + buffer.substring(str_pos, str_pos + att_data);
+        // Packet Header + Packet Data
+        String str = "X" + buffer.substring(str_pos, str_pos + packet_data);
         pCharacteristic->indicate(str);
         buffer.clear();
         isInProgress = false;

@@ -8,7 +8,7 @@ private:
 public:
     ~MyPasswordManager();
     void init();
-    void readValue(String value);
+    void readValue(String &value);
     void typeDecoder(int type);
     void sendPassword();
     void sendUserInfo();

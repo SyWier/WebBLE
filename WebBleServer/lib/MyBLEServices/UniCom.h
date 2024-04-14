@@ -10,7 +10,7 @@
 // Callback function for user interface
 class UniComCallback {
 public:
-    virtual void readValue(String value);
+    virtual void readValue(String &value);
 };
 
 // Universal Communication
@@ -19,12 +19,13 @@ private:
     enum {
             ATT_HEADER = 3, // ATT header size for write, read, notification, indication
             UNICOM_HEADER = 1,
-            PACKET_HEADER = ATT_HEADER + UNICOM_HEADER,
     };
     int att_mtu;
     int att_data;
+    int packet_data;
     int packet_size;
 
+    String inBuffer;
     String buffer;
     int str_pos;
     bool isInProgress;
