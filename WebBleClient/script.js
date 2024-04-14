@@ -206,7 +206,7 @@ class WebBLE {
         console.log("Received value: ", received);
         received = this.unpack(received);
         switch(received.type) {
-            case 'P':
+            case 'O':
                 this.uniCom.buffer += received.data;
                 this.btn.response.innerHTML = 'In progress...';
                 break;

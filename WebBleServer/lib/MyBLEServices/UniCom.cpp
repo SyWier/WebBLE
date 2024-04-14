@@ -83,7 +83,7 @@ void UniCom::sendPacket() {
     // Need to send out the string + att header (3 byte) in each packet
     DEBUG_MSG("Sending packet...\n");
     if(str_pos + att_data < buffer.length()) {
-        String str = "P" + buffer.substring(str_pos, str_pos + att_data);
+        String str = "O" + buffer.substring(str_pos, str_pos + att_data);
         pCharacteristic->indicate(str);
         str_pos += att_data;
     } else {
