@@ -17,7 +17,6 @@ void setup() {
     MyBLEServer::init();
 
     myPasswordManager.init();
-    uniCom.addCallbacK(&myPasswordManager);
     rntService.init(ledPin);
 
     MyBLEServer::start();

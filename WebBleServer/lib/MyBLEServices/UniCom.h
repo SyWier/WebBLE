@@ -31,14 +31,14 @@ private:
     bool isInProgress;
 
 private:
-    UniComCallback* uniComCallback;
+    std::function<void(String &value)> callback;
     NimBLEService *pService;
     NimBLECharacteristic *pCharacteristic;
 
 public:
     UniCom(int bufferSize = 2000);
     void init();
-    void addCallbacK(UniComCallback* uniComCallback);
+    void addCallback(std::function<void(String &value)> callback);
     
     void sendPacket();
     void sendString(String &str);

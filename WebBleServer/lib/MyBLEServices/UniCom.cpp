@@ -22,7 +22,7 @@ void UniCom::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code)
 }
 
 void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
-    if(uniComCallback == nullptr)
+    if(callback == nullptr)
         return;
 
     String str = pCharacteristic->getValue();
@@ -33,7 +33,7 @@ void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
             break;
         case 'X':
             inBuffer += str.substring(1);
-            uniComCallback->readValue(inBuffer);
+            callback(inBuffer);
             inBuffer = "";
             break;
         default:
@@ -43,7 +43,7 @@ void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
 
 // Universal communication
 UniCom::UniCom(int bufferSize /* 2000 */) {
-    uniComCallback = nullptr;
+    callback = nullptr;
     pService = nullptr;
     pCharacteristic = nullptr;
 
@@ -88,7 +88,7 @@ void UniCom::init() {
         NIMBLE_PROPERTY::INDICATE
     );
 
-    // Set callback class
+    // Set characteristic callback
     pCharacteristic->setCallbacks(this);
 
     // Start service
@@ -99,8 +99,8 @@ void UniCom::init() {
     MyBLEServer::adverticeService(UNI_SERVICE_UUID);
 }
 
-void UniCom::addCallbacK(UniComCallback* uniComCallback) {
-    this->uniComCallback = uniComCallback;
+void UniCom::addCallback(std::function<void(String &value)> callback) {
+    this->callback = callback;
 }
 
 void UniCom::sendPacket() {

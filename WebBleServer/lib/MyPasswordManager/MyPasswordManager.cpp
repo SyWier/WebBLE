@@ -6,6 +6,9 @@
 void MyPasswordManager::init() {
     DEBUG_MSG("Initializing MyPasswordManager...\n");
     uniCom.init();
+    uniCom.addCallback([=](String &str) {readValue(str);});
+    // Alternatively use bind:
+    // uniCom.addCallback(std::bind(&MyPasswordManager::readValue, &myPasswordManager, std::placeholders::_1));
 }
 
 void MyPasswordManager::readValue(String &value) {
@@ -18,8 +21,6 @@ void MyPasswordManager::readValue(String &value) {
         DEBUG_MSG("Device is not authenticated!\n");
         return;
     }
-
-    // std::function var;
 
     DEBUG_MSG("Message received: %s\n", value.c_str());
 

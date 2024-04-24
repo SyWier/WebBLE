@@ -1,7 +1,7 @@
 #include <UniCom.h>
 
 // Calback for the UniCom Characteristics
-class MyPasswordManager : public UniComCallback {
+class MyPasswordManager {
 private:
     UniCom &uniCom;
 
