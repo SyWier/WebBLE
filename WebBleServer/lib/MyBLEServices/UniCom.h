@@ -26,7 +26,7 @@ private:
     int packet_size;
 
     String inBuffer;
-    String buffer;
+    String outBuffer;
     int str_pos;
     bool isInProgress;
 
@@ -36,8 +36,9 @@ private:
     NimBLECharacteristic *pCharacteristic;
 
 public:
-    UniCom(UniComCallback* uniComCallback = nullptr);
+    UniCom(int bufferSize = 2000);
     void init();
+    void addCallbacK(UniComCallback* uniComCallback);
     
     void sendPacket();
     void sendString(String &str);

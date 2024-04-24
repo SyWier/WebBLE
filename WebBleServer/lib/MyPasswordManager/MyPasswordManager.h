@@ -3,10 +3,10 @@
 // Calback for the UniCom Characteristics
 class MyPasswordManager : public UniComCallback {
 private:
-    UniCom* uniCom;
+    UniCom &uniCom;
 
 public:
-    ~MyPasswordManager();
+    MyPasswordManager(UniCom &uniCom) : uniCom(uniCom) {}
     void init();
     void readValue(String &value);
     void typeDecoder(int type);

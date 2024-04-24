@@ -34,7 +34,7 @@ void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
         case 'X':
             inBuffer += str.substring(1);
             uniComCallback->readValue(inBuffer);
-            inBuffer.clear();
+            inBuffer = "";
             break;
         default:
             DEBUG_MSG("Unknown packet type.\n");
@@ -42,8 +42,8 @@ void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
 }
 
 // Universal communication
-UniCom::UniCom(UniComCallback* uniComCallback /*nullptr*/) {
-    this->uniComCallback = uniComCallback;
+UniCom::UniCom(int bufferSize /* 2000 */) {
+    uniComCallback = nullptr;
     pService = nullptr;
     pCharacteristic = nullptr;
 
@@ -52,6 +52,9 @@ UniCom::UniCom(UniComCallback* uniComCallback /*nullptr*/) {
     packet_data = att_data - UNICOM_HEADER;
     packet_size = packet_data + UNICOM_HEADER;
     isInProgress = false;
+
+    inBuffer.reserve(bufferSize);
+    outBuffer.reserve(bufferSize);
 
     init();
 }
@@ -95,19 +98,23 @@ void UniCom::init() {
     // Advertice service
     MyBLEServer::adverticeService(UNI_SERVICE_UUID);
 }
+
+void UniCom::addCallbacK(UniComCallback* uniComCallback) {
+    this->uniComCallback = uniComCallback;
+}
+
 void UniCom::sendPacket() {
     // Need to send out the string + att header (3 byte) in each packet
     DEBUG_MSG("Sending packet...\n");
-    if(str_pos + packet_data < buffer.length()) {
-        String str = "O" + buffer.substring(str_pos, str_pos + packet_data);
+    if(str_pos + packet_data < outBuffer.length()) {
+        String str = "O" + outBuffer.substring(str_pos, str_pos + packet_data);
         str_pos += packet_data;
         pCharacteristic->indicate(str);
     } else {
         DEBUG_MSG("Lasts packet!\n");
         // Packet Header + Packet Data
-        String str = "X" + buffer.substring(str_pos, str_pos + packet_data);
+        String str = "X" + outBuffer.substring(str_pos, str_pos + packet_data);
         pCharacteristic->indicate(str);
-        buffer.clear();
         isInProgress = false;
     }
 }
@@ -120,7 +127,7 @@ void UniCom::sendString(String &str) {
     }
     isInProgress = true;
 
-    buffer = str;
+    outBuffer = str;
     str_pos = 0;
 
     sendPacket();
