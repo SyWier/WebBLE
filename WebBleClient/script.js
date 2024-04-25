@@ -170,7 +170,7 @@ class WebBLE {
     }
 
     // RNT led write function
-    writeOnCharacteristic(value){
+    async writeOnCharacteristic(value){
         if(!this.isBleConnected()) {
             return false;
         }
@@ -179,23 +179,28 @@ class WebBLE {
         }
 
         const data = new Uint8Array([value]);
-        this.rnt.ledChar.writeValue(data)
-        .then(() => {
+
+        try {
+            await this.rnt.ledChar.writeValue(data);
             this.dom.latestValueSent.innerHTML = value;
             console.log("Value written to LED characteristic:", value);
-        })
-        .catch(error => {
+        } catch (error) {
             console.error("Error writing to the LED characteristic: ", error);
-        });
+        }
     }
 
     async getUniComService() {
         try {
+            // Get service
             this.uniCom.service = await this.ble.server.getPrimaryService(this.uniCom.serviceUUID);
             console.log("Service discovered:", this.uniCom.service.uuid);
+
+            // Get characteristic
             this.uniCom.char = await this.uniCom.service.getCharacteristic(this.uniCom.charUUID);
             console.log("Characteristic discovered:", this.uniCom.char.uuid);
             this.uniCom.char.addEventListener('characteristicvaluechanged', this.handleReceived.bind(this));
+
+            // Start notifications
             this.uniCom.char.startNotifications();
             console.log("Notifications Started.");
         } catch(error) {
@@ -243,7 +248,7 @@ class WebBLE {
         let data_size = 100;
         let segment;
 
-        while(pos <= string.length) {
+        while(pos < string.length) {
             console.log("Sending packet...");
             segment = this.pack(string, pos, data_size);
             pos += data_size;
@@ -268,32 +273,32 @@ class WebBLE {
         } catch(error) {
             console.error("Error requesting data: ", error);
         }
-
     }
 
-    disconnectDevice() {
+    async disconnectDevice() {
         if(!this.isBleConnected()) {
             return false;
         }
 
         console.log("Disconnect Device.");
+
         if(this.rnt.counterChar) {
             this.rnt.counterChar.stopNotifications()
-                .then(() => {
-                    console.log("Notifications Stopped");
-                    return this.ble.server.disconnect();
-                })
-                .then(() => {
-                    console.log("Device Disconnected");
-                    this.dom.bleStateContainer.innerHTML = "Device Disconnected";
-                    this.dom.bleStateContainer.style.color = "#d13a30";
+            console.log("RNT notifications stopped.");
+        }
 
-                })
-                .catch(error => {
-                    console.log("An error occurred:", error);
-                });
-        } else {
-            console.log("No characteristic found to disconnect.");
+        if(this.uniCom.char) {
+            this.uniCom.char.stopNotifications();
+            console.log("UniCom notifications stopped.");
+        }
+
+        try {
+            await this.ble.server.disconnect();
+            console.log("Device Disconnected");
+            this.dom.bleStateContainer.innerHTML = "Device Disconnected";
+            this.dom.bleStateContainer.style.color = "#d13a30";
+        } catch(error) {
+            console.log("An error occurred:", error);
         }
     }
 

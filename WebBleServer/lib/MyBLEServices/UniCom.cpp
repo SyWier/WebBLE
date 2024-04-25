@@ -22,8 +22,10 @@ void UniCom::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code)
 }
 
 void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
-    if(callback == nullptr)
+    if(callback == nullptr) {
+        DEBUG_MSG("No callback function has been set.\n");
         return;
+    }
 
     String str = pCharacteristic->getValue();
     char type = str[0];
@@ -99,7 +101,7 @@ void UniCom::init() {
     MyBLEServer::adverticeService(UNI_SERVICE_UUID);
 }
 
-void UniCom::addCallback(std::function<void(String &value)> callback) {
+void UniCom::addCallback(std::function<void(String &str)> callback) {
     this->callback = callback;
 }
 
