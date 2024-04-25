@@ -32,6 +32,7 @@ void MyPasswordManager::readValue(String &value) {
 void MyPasswordManager::typeDecoder(int type) {
     DEBUG_MSG("Type: %d\n", type);
     String val;
+    vector<uint8_t> value;
     switch(type) {
         case 1: 
             // val = "Button A";
@@ -45,7 +46,11 @@ void MyPasswordManager::typeDecoder(int type) {
             break;
         case 3:
             DEBUG_MSG("Sending password...\n");
-            sendPassword();
+            // sendPassword();
+            value.push_back('a');
+            value.push_back('b');
+            value.push_back('c');
+            uniCom.sendValue(value);
             break;
         default:
             DEBUG_MSG("Unknown button\n");

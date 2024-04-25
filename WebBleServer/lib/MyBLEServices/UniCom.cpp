@@ -105,6 +105,28 @@ void UniCom::addCallback(std::function<void(String &str)> callback) {
     this->callback = callback;
 }
 
+// void UniCom::createPacket() {
+//     PacketHeader packetHeader = {
+//         .packetType = PACKET_DATA,
+//         .dataType = VALUE,
+//         .flags = NO_FLAG,
+//         .count = 0,
+//     };
+//     DEBUG_MSG("\nSize of header: %d\n", sizeof(packetHeader));
+//     DEBUG_MSG("Size of packet type: %d\n", sizeof(packetHeader.packetType));
+//     DEBUG_MSG("Size of data type: %d\n", sizeof(packetHeader.dateType));
+//     DEBUG_MSG("Size of flag: %d\n", sizeof(packetHeader.flags));
+//     DEBUG_MSG("Size of count: %d\n\n", sizeof(packetHeader.count));
+
+//     std::vector<uint8_t> value;
+//     String str = "Hello";
+
+//     value.assign((uint8_t*)&packetHeader, (uint8_t*)&packetHeader+3);
+//     value.insert(value.end(), str.begin(), str.end());
+
+//     pCharacteristic->indicate(value);
+// }
+
 void UniCom::sendPacket() {
     // Need to send out the string + att header (3 byte) in each packet
     DEBUG_MSG("Sending packet...\n");
@@ -119,6 +141,72 @@ void UniCom::sendPacket() {
         pCharacteristic->indicate(str);
         isInProgress = false;
     }
+}
+
+size_t UniCom::getFlagSize(PacketHeader packetHeader) {
+    size_t unmapFlag[256] = {0, 2, 4, 6};
+    return PACKET_HEADER_SIZE + unmapFlag[packetHeader.flags];
+}
+
+void UniCom::sendPacket(PacketHeader packetHeader, PacketHeaderData packetHeaderData) {
+    // Calculate packet size
+    size_t length = PACKET_HEADER_SIZE + getFlagSize(packetHeader) + packetHeaderData.packetData.size;
+    if(length > att_mtu - ATT_HEADER) {
+        DEBUG_MSG("Packet size is bigger then MTU!\n");
+        return;
+    }
+
+    // Allocate memory
+    uint8_t* data = new uint8_t[length];
+    uint32_t pos = 0;
+
+    // Fill memory with data
+    memcpy(data, &packetHeader, PACKET_HEADER_SIZE);
+    pos += PACKET_HEADER_SIZE;
+
+    // Optional data based on flag
+    if(packetHeader.flags&ID_FLAG) {
+        memcpy(data+pos, &packetHeaderData.id, 2);
+        pos += 2;
+    }
+
+    if(packetHeader.flags&LEN_FLAG) {
+        memcpy(data+pos, &packetHeaderData.length, 4);
+        pos += 4;
+    }
+
+    if(packetHeader.dataType == VALUE) {
+        memcpy(data+pos, &packetHeaderData.length, 4);
+        pos += 4;
+    }
+
+    // Packet data
+    memcpy(data+pos, packetHeaderData.packetData.data, packetHeaderData.packetData.size);
+
+    // Send packet
+    pCharacteristic->indicate(data, length);
+}
+
+void UniCom::sendValue(uint8_t* value, size_t length) {
+    PacketHeader packetHeader = {
+        .packetType = PACKET_DATA,
+        .dataType = VALUE,
+        .flags = NO_FLAG,
+        .count = 0,
+    };
+
+    PacketHeaderData packetHeaderData {
+        .packetData = {
+            .data = value,
+            .size = length
+        }
+    };
+
+    sendPacket(packetHeader, packetHeaderData);
+}
+
+void UniCom::sendValue(vector<uint8_t> &value) {
+    sendValue(value.data(), value.size());
 }
 
 void UniCom::sendString(String &str) {
