@@ -215,7 +215,14 @@ class WebBLE {
         };
     }
 
+    bufferToHex(buffer) {
+        return [...new Uint8Array (buffer)]
+            .map (b => b.toString (16).padStart (2, "0"))
+            .join (" ");
+    }
+
     handleReceived(event) {
+        console.log("Received value (HEX): ", this.bufferToHex(event.target.value.buffer));
         let received = new TextDecoder().decode(event.target.value);
         console.log("Received value: ", received);
         received = this.unpack(received);
