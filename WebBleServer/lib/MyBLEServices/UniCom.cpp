@@ -144,8 +144,9 @@ void UniCom::sendPacket() {
 }
 
 size_t UniCom::getFlagSize(PacketHeader packetHeader) {
+    // Unmap additional size based on flags selected
     size_t unmapFlag[256] = {0, 2, 4, 6};
-    return PACKET_HEADER_SIZE + unmapFlag[packetHeader.flags];
+    return unmapFlag[packetHeader.flags];
 }
 
 void UniCom::sendPacket(PacketHeader packetHeader, PacketHeaderData packetHeaderData) {
@@ -175,13 +176,11 @@ void UniCom::sendPacket(PacketHeader packetHeader, PacketHeaderData packetHeader
         pos += 4;
     }
 
+    // Optional data based on packet data type
     if(packetHeader.dataType == VALUE) {
-        memcpy(data+pos, &packetHeaderData.length, 4);
-        pos += 4;
+        memcpy(data+pos, packetHeaderData.packetData.data, packetHeaderData.packetData.size);
+        pos += packetHeaderData.packetData.size;
     }
-
-    // Packet data
-    memcpy(data+pos, packetHeaderData.packetData.data, packetHeaderData.packetData.size);
 
     // Send packet
     pCharacteristic->indicate(data, length);
