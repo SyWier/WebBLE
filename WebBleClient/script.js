@@ -1,12 +1,7 @@
-class WebBLE {
-    constructor() {
-        // Variables to Handle Bluetooth
-        this.ble = {
-            deviceName :'ESP32',
-            device : null,
-            server : null,
-            att_data : 497, // Max MTU - Max ATT Header = 512 - 15 = 497
-        };
+class RNTService {
+    constructor(webBLE) {
+        // Get site dom
+        this.dom = webBLE.dom;
 
         // RNT service
         this.rnt = {
@@ -17,118 +12,21 @@ class WebBLE {
             ledCharUUID : '19b10002-e8f2-537e-4f6c-d104768a1214',
             ledChar : null,
         };
-
-        // UniCom service
-        this.uniCom = {
-            serviceUUID : '19b20000-e8f2-537e-4f6c-d104768a1214',
-            service : null,
-            charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
-            char : null,
-            buffer : '',
-            packet_data : this.ble.att_data - 1, // UniCom Header size is 1
-        };
-
-        this.getDomElements();
-        this.createButtons();
     }
 
-    getDomElements() {
-        // DOM Elements
-        this.dom = {
-            connectButton : document.getElementById('connectBleButton'),
-            disconnectButton : document.getElementById('disconnectBleButton'),
-            onButton : document.getElementById('onButton'),
-            offButton : document.getElementById('offButton'),
-            retrievedValue : document.getElementById('valueContainer'),
-            latestValueSent : document.getElementById('valueSent'),
-            bleStateContainer : document.getElementById('bleState'),
-            timestampContainer : document.getElementById('timestamp'),
-        };
-        // Request and Response
-        this.btn = {
-            btnA : document.getElementById('btnA'),
-            btnB : document.getElementById('btnB'),
-            btnC : document.getElementById('btnC'),
-            response : document.getElementById('response'),
-        }
-    }
-
-    createButtons() {
-        // Connect Button (search for BLE Devices only if BLE is available)
-        this.dom.connectButton.addEventListener('click', this.connectToDevice.bind(this));
-
-        // Disconnect Button
-        this.dom.disconnectButton.addEventListener('click', this.disconnectDevice.bind(this));
-
-        // Write to the ESP32 LED Characteristic
-        this.dom.onButton.addEventListener('click', () => this.writeOnCharacteristic(1));
-        this.dom.offButton.addEventListener('click', () => this.writeOnCharacteristic(0));
-
-        // Request data
-        this.btn.btnA.addEventListener('click', () => this.requestData(1));
-        this.btn.btnB.addEventListener('click', () => this.requestData(2));
-        this.btn.btnC.addEventListener('click', () => this.requestData(3));
-    }
-
-    // Check if BLE is available in your Browser
-    isWebBluetoothEnabled() {
-        if(!navigator.bluetooth) {
-            console.log('Web Bluetooth API is not available in this browser!');
-            this.dom.bleStateContainer.innerHTML = "Web Bluetooth API is not available in this browser/device!";
-            return false;
-        }
-        console.log('Web Bluetooth API supported in this browser.');
-        return true;
-    }
-
-    isBleConnected() {
-        if(this.ble.server && this.ble.server.connected) {
-            return true;
-        } else {
-            console.error ("Bluetooth is not connected.");
-            window.alert("Bluetooth is not connected!");
-            return false;
-        }
-    }
-
-    // Connect to BLE Device
-    async connectToDevice(){
-        if(!this.isWebBluetoothEnabled()){
-            return false;
-        }
-
+    async getService(bleServer) {
         try {
-            console.log('Initializing Bluetooth...');
-            this.ble.device = await navigator.bluetooth.requestDevice({
-                filters: [{namePrefix: this.ble.deviceName}],
-                //filters: [{name: this.rnt.deviceName}],
-                optionalServices: [this.rnt.serviceUUID, this.uniCom.serviceUUID]
-            });
-            console.log('Device Selected:', this.ble.device.name);
-    
-            this.dom.bleStateContainer.innerHTML = 'Connected to device ' + this.ble.device.name;
-            this.dom.bleStateContainer.style.color = "#24af37";
-            this.ble.device.addEventListener('gattservicedisconnected', this.onDisconnected.bind(this));
-    
-            this.ble.server = await this.ble.device.gatt.connect();
-            console.log("Connected to GATT Server");
-    
-            this.getRandomNerdTutorialService();
-            this.getUniComService();
-        } catch(error) {
-            console.log('Error: ', error);
-        }
-    }
-
-    async getRandomNerdTutorialService() {
-        try {
-            this.rnt.service = await this.ble.server.getPrimaryService(this.rnt.serviceUUID)
+            this.rnt.service = await bleServer.getPrimaryService(this.rnt.serviceUUID)
             console.log("Service discovered:", this.rnt.service.uuid);
             this.initRNTcounter();
             this.initRNTled();
         } catch(error) {
             console.log('Error: ', error);
         }
+    }
+
+    getServiceUUID() {
+        return this.rnt.serviceUUID;
     }
 
     // Get Counter Characteristics and Enable Notifications
@@ -153,13 +51,6 @@ class WebBLE {
         }
     }
 
-    handleCounter(event){
-        const newValueReceived = new TextDecoder().decode(event.target.value);
-        console.log("Characteristic value changed: ", newValueReceived);
-        this.dom.retrievedValue.innerHTML = newValueReceived;
-        this.dom.timestampContainer.innerHTML = getDateTime();
-    }
-
     async initRNTled() {
         try {
             this.rnt.ledChar = await this.rnt.service.getCharacteristic(this.rnt.ledCharUUID)
@@ -169,9 +60,16 @@ class WebBLE {
         }
     }
 
+    handleCounter(event){
+        const newValueReceived = new TextDecoder().decode(event.target.value);
+        console.log("Characteristic value changed: ", newValueReceived);
+        this.dom.retrievedValue.innerHTML = newValueReceived;
+        this.dom.timestampContainer.innerHTML = getDateTime();
+    }
+
     // RNT led write function
-    async writeOnCharacteristic(value){
-        if(!this.isBleConnected()) {
+    async writeLED(value){
+        if(!webBLE.isBleConnected()) {
             return false;
         }
         if(!this.rnt.ledChar) {
@@ -189,10 +87,32 @@ class WebBLE {
         }
     }
 
-    async getUniComService() {
+    bindButton(onButton, offButton) {
+        onButton.addEventListener('click', () => this.writeLED(1));
+        offButton.addEventListener('click', () => this.writeLED(0));
+    }
+};
+
+class UniCom {
+    constructor(webBLE) {
+        // Get site dom
+        this.btn = webBLE.btn;
+
+        // Unicom service
+        this.uniCom = {
+            serviceUUID : '19b20000-e8f2-537e-4f6c-d104768a1214',
+            service : null,
+            charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
+            char : null,
+            buffer : '',
+            packet_data : 497 - 1, // UniCom Header size is 1
+        };
+    }
+
+    async getService(bleServer) {
         try {
             // Get service
-            this.uniCom.service = await this.ble.server.getPrimaryService(this.uniCom.serviceUUID);
+            this.uniCom.service = await bleServer.getPrimaryService(this.uniCom.serviceUUID);
             console.log("Service discovered:", this.uniCom.service.uuid);
 
             // Get characteristic
@@ -264,7 +184,7 @@ class WebBLE {
     }
 
     async requestData(value) {
-        if(!this.isBleConnected()) {
+        if(!webBLE.isBleConnected()) {
             return false;
         }
         if(!this.uniCom.char) {
@@ -279,6 +199,126 @@ class WebBLE {
             await this.sendString(str);
         } catch(error) {
             console.error("Error requesting data: ", error);
+        }
+    }
+
+    bindButtons() {
+        this.btn.btnA.addEventListener('click', () => this.requestData(1));
+        this.btn.btnB.addEventListener('click', () => this.requestData(2));
+        this.btn.btnC.addEventListener('click', () => this.requestData(3));
+    }
+
+    getServiceUUID() {
+        return this.uniCom.serviceUUID;
+    }
+};
+
+class WebBLE {
+    constructor() {
+        // Variables to Handle Bluetooth
+        this.ble = {
+            deviceName :'ESP32',
+            device : null,
+            server : null,
+            att_data : 497, // Max MTU - Max ATT Header = 512 - 15 = 497
+        };
+
+        this.getDomElements();
+
+        // RNT Service
+        this.rntService = new RNTService(this);
+
+        // UniCom service
+        this.unicomService = new UniCom(this);
+        
+        this.createButtons();
+    }
+
+    getDomElements() {
+        // DOM Elements
+        this.dom = {
+            connectButton : document.getElementById('connectBleButton'),
+            disconnectButton : document.getElementById('disconnectBleButton'),
+            onButton : document.getElementById('onButton'),
+            offButton : document.getElementById('offButton'),
+            retrievedValue : document.getElementById('valueContainer'),
+            latestValueSent : document.getElementById('valueSent'),
+            bleStateContainer : document.getElementById('bleState'),
+            timestampContainer : document.getElementById('timestamp'),
+        };
+        // Request and Response
+        this.btn = {
+            btnA : document.getElementById('btnA'),
+            btnB : document.getElementById('btnB'),
+            btnC : document.getElementById('btnC'),
+            response : document.getElementById('response'),
+        }
+    }
+
+    createButtons() {
+        // Connect Button (search for BLE Devices only if BLE is available)
+        this.dom.connectButton.addEventListener('click', this.connectToDevice.bind(this));
+
+        // Disconnect Button
+        this.dom.disconnectButton.addEventListener('click', this.disconnectDevice.bind(this));
+
+        // Write to the ESP32 LED Characteristic
+        this.rntService.bindButton(this.dom.onButton, this.dom.offButton);
+
+        // Request data
+        this.unicomService.bindButtons();
+    }
+
+    // Check if BLE is available in your Browser
+    isWebBluetoothEnabled() {
+        if(!navigator.bluetooth) {
+            console.log('Web Bluetooth API is not available in this browser!');
+            this.dom.bleStateContainer.innerHTML = "Web Bluetooth API is not available in this browser/device!";
+            return false;
+        }
+        console.log('Web Bluetooth API supported in this browser.');
+        return true;
+    }
+
+    isBleConnected() {
+        if(this.ble.server && this.ble.server.connected) {
+            return true;
+        } else {
+            console.error ("Bluetooth is not connected.");
+            window.alert("Bluetooth is not connected!");
+            return false;
+        }
+    }
+
+    // Connect to BLE Device
+    async connectToDevice() {
+        if(!this.isWebBluetoothEnabled()){
+            return false;
+        }
+
+        try {
+            console.log('Initializing Bluetooth...');
+            this.ble.device = await navigator.bluetooth.requestDevice({
+                filters: [{namePrefix: this.ble.deviceName}],
+                //filters: [{name: this.rnt.deviceName}],
+                optionalServices: [
+                    this.rntService.getServiceUUID(),
+                    this.unicomService.getServiceUUID()
+                ]
+            });
+            console.log('Device Selected:', this.ble.device.name);
+    
+            this.dom.bleStateContainer.innerHTML = 'Connected to device ' + this.ble.device.name;
+            this.dom.bleStateContainer.style.color = "#24af37";
+            this.ble.device.addEventListener('gattservicedisconnected', this.onDisconnected.bind(this));
+    
+            this.ble.server = await this.ble.device.gatt.connect();
+            console.log("Connected to GATT Server");
+
+            this.rntService.getService(this.ble.server);
+            this.unicomService.getService(this.ble.server);
+        } catch(error) {
+            console.log('Error: ', error);
         }
     }
 
