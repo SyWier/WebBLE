@@ -91,6 +91,13 @@ class RNTService {
         onButton.addEventListener('click', () => this.writeLED(1));
         offButton.addEventListener('click', () => this.writeLED(0));
     }
+
+    stop() {
+        if(this.rnt.counterChar) {
+            this.rnt.counterChar.stopNotifications();
+            console.log("RNT notifications stopped.");
+        }
+    }
 };
 
 class UniCom {
@@ -211,6 +218,13 @@ class UniCom {
     getServiceUUID() {
         return this.uniCom.serviceUUID;
     }
+
+    stop() {
+        if(this.uniCom.char) {
+            this.uniCom.char.stopNotifications();
+            console.log("UniCom notifications stopped.");
+        }
+    }
 };
 
 class WebBLE {
@@ -329,15 +343,8 @@ class WebBLE {
 
         console.log("Disconnect Device.");
 
-        if(this.rnt.counterChar) {
-            this.rnt.counterChar.stopNotifications()
-            console.log("RNT notifications stopped.");
-        }
-
-        if(this.uniCom.char) {
-            this.uniCom.char.stopNotifications();
-            console.log("UniCom notifications stopped.");
-        }
+        this.rntService.stop();
+        this.unicomService.stop();
 
         try {
             await this.ble.server.disconnect();
@@ -349,7 +356,7 @@ class WebBLE {
         }
     }
 
-    onDisconnected(event){
+    onDisconnected(event) {
         console.log('Device Disconnected:', event.target.device.name);
         this.dom.bleStateContainer.innerHTML = "Device disconnected";
         this.dom.bleStateContainer.style.color = "#d13a30";
