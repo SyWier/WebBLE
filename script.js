@@ -111,8 +111,28 @@ class UniCom {
             service : null,
             charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
             char : null,
-            buffer : '',
-            packet_data : 497 - 1, // UniCom Header size is 1
+        };
+
+        this.buffer = '';
+        this.counter = 0;
+        this.isInProggress = false;
+        this.data_size = 497 - 1; // UniCom Header size is 1
+
+        this.packetType = {
+            data : 0x0D,
+            extData : 0xED
+        };
+
+        this.dataType = {
+            value : 0x10,
+            string : 0x20,
+            json : 0x30
+        };
+
+        this.flags = {
+            no_flag : 0,
+            id_flag : 1,
+            len_flag : 2
         };
     }
 
@@ -137,9 +157,22 @@ class UniCom {
 
     unpack(packet) {
         return {
-            type : packet.charAt(0),
-            data : packet.slice(1 - packet.length)
+            header : {
+                packetType : packet[0],
+                dataType : packet[1],
+                flags : packet[2],
+                count : packet[3]
+            },
+            data : packet.subarray(4)
         };
+    }
+
+    pack(str, pos, size) {
+        if(pos + size < str.length) {
+            return "O" + str.substr(pos, size);
+        } else {
+            return "X" + str.substr(pos, size);
+        }
     }
 
     bufferToHex(buffer) {
@@ -149,31 +182,64 @@ class UniCom {
     }
 
     handleReceived(event) {
-        console.log("Received value (HEX): ", this.bufferToHex(event.target.value.buffer));
-        let received = new TextDecoder().decode(event.target.value);
-        console.log("Received value: ", received);
-        received = this.unpack(received);
-        switch(received.type) {
-            case 'O':
-                this.uniCom.buffer += received.data;
-                this.btn.response.innerHTML = 'In progress...';
+        // Convert data
+        let value = new Uint8Array(event.target.value.buffer);
+        let packetType = value[0];
+        console.log("Received value (HEX): ", this.bufferToHex(value));
+
+        // Proccess data
+        switch(packetType) {
+            case this.packetType.data:
+                this.handleData(value);
                 break;
-            case 'X':
-                this.uniCom.buffer += received.data
-                this.btn.response.innerHTML = this.uniCom.buffer;
-                this.uniCom.buffer = '';
+            case this.packetType.extData:
+                this.handleExtData(value);
                 break;
             default:
-                console.log("Error: Unknown packet header!");
+                console.log("Error: Unknown packet type!");
         }
     }
 
-    pack(str, pos, size) {
-        if(pos + size < str.length) {
-            return "O" + str.substr(pos, size);
-        } else {
-            return "X" + str.substr(pos, size);
+    handleData(value) {
+        let received = this.unpack(value);
+        switch(received.header.dataType) {
+            case this.dataType.value:
+                this.proccessValue(received.data);
+                break;
+            case this.dataType.string:
+                this.proccessString();
+                break;
+            case this.dataType.json:
+                this.proccessJSON();
+                break;
+            default:
+                console.log("Error: Unknown data type!");
+
         }
+    }
+
+    handleExtData(value) {
+        this.buffer += value.subarray(4);
+        this.counter += 1;
+        this.btn.response.innerHTML = this.uniCom.buffer;
+        this.uniCom.buffer = '';
+    }
+
+    proccessValue(data) {
+        this.buffer = data;
+        this.btn.response.innerHTML = this.buffer;
+    }
+
+    proccessString() {
+        this.buffer = '';
+        this.counter = 0;
+        this.isInProggress = true;
+    }
+
+    proccessJSON() {
+        this.buffer = '';
+        this.counter = 0;
+        this.isInProggress = true;
     }
 
     async sendString(string) {
@@ -210,9 +276,12 @@ class UniCom {
     }
 
     bindButtons() {
-        this.btn.btnA.addEventListener('click', () => this.requestData(1));
-        this.btn.btnB.addEventListener('click', () => this.requestData(2));
-        this.btn.btnC.addEventListener('click', () => this.requestData(3));
+        this.btn.btnR1.addEventListener('click', () => this.requestData(3));
+        this.btn.btnR2.addEventListener('click', () => this.requestData(2));
+        this.btn.btnR3.addEventListener('click', () => this.requestData(1));
+        this.btn.btnS1.addEventListener('click', () => this.requestData(3));
+        this.btn.btnS2.addEventListener('click', () => this.requestData(2));
+        this.btn.btnS3.addEventListener('click', () => this.requestData(1));
     }
 
     getServiceUUID() {
@@ -262,9 +331,12 @@ class WebBLE {
         };
         // Request and Response
         this.btn = {
-            btnA : document.getElementById('btnA'),
-            btnB : document.getElementById('btnB'),
-            btnC : document.getElementById('btnC'),
+            btnR1 : document.getElementById('btnR1'),
+            btnR2 : document.getElementById('btnR2'),
+            btnR3 : document.getElementById('btnR3'),
+            btnS1 : document.getElementById('btnS1'),
+            btnS2 : document.getElementById('btnS2'),
+            btnS3 : document.getElementById('btnS3'),
             response : document.getElementById('response'),
         }
     }
