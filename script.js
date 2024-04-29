@@ -90,6 +90,8 @@ class RNTService {
     bindButton(onButton, offButton) {
         onButton.addEventListener('click', () => this.writeLED(1));
         offButton.addEventListener('click', () => this.writeLED(0));
+        this.dom.fetchOn.addEventListener('click', () => this.rnt.counterChar?.startNotifications());
+        this.dom.fetchOff.addEventListener('click', () => this.stop());
     }
 
     stop() {
@@ -113,9 +115,15 @@ class UniCom {
             char : null,
         };
 
+        this.progressType = {
+            idle : 0,
+            sending : 1,
+            receiving : 2
+        }
+
         this.buffer = '';
         this.counter = 0;
-        this.isInProggress = false;
+        this.isInProgress = this.progressType.idle;
         this.data_size = 497 - 1; // UniCom Header size is 1
 
         this.packetType = {
@@ -233,26 +241,51 @@ class UniCom {
     proccessString() {
         this.buffer = '';
         this.counter = 0;
-        this.isInProggress = true;
+        this.isInProgress = true;
     }
 
     proccessJSON() {
         this.buffer = '';
         this.counter = 0;
-        this.isInProggress = true;
+        this.isInProgress = true;
+    }
+
+    async sendValue(value) {
+        console.log("Sending value...");
+        console.log(value.length);
+        let data = new Int8Array(4+value.length);
+        data[0] = this.packetType.data;
+        data[1] = this.dataType.value;
+        data[2] = this.flags.no_flag;
+        data[3] = 0;
+        data.set(value, 4);
+        console.log("Value (HEX): ", this.bufferToHex(data));
+
+        await this.uniCom.char.writeValue(data);
     }
 
     async sendString(string) {
+        console.log("Sending string...");
+
         let pos = 0;
-        // let data_size = this.uniCom.packet_data;
-        let data_size = 100;
-        let segment;
+        let data_size = 100; // this.data_size for original
+
+        let data = new Int8Array(4);
+        data[0] = this.packetType.data;
+        data[1] = this.dataType.string;
+        data[2] = this.flags.no_flag;
+        data[3] = Math.ceil(string.length/data_size);
+        await this.uniCom.char.writeValue(data);
 
         while(pos < string.length) {
             console.log("Sending packet...");
-            segment = this.pack(string, pos, data_size);
-            pos += data_size;
-            await this.uniCom.char.writeValue(new TextEncoder().encode(segment));
+
+            let length = Math.min(data_size, string.length-pos);
+            let segment = new Uint8Array(length + 1);
+            segment[0] = this.packetType.extData;
+            segment.set(new TextEncoder().encode(string.substr(pos, length)), 1);
+            pos += length;
+            await this.uniCom.char.writeValue(segment);
         }
     }
 
@@ -276,12 +309,12 @@ class UniCom {
     }
 
     bindButtons() {
-        this.btn.btnR1.addEventListener('click', () => this.requestData(3));
+        this.btn.btnR1.addEventListener('click', () => this.requestData(1));
         this.btn.btnR2.addEventListener('click', () => this.requestData(2));
-        this.btn.btnR3.addEventListener('click', () => this.requestData(1));
-        this.btn.btnS1.addEventListener('click', () => this.requestData(3));
-        this.btn.btnS2.addEventListener('click', () => this.requestData(2));
-        this.btn.btnS3.addEventListener('click', () => this.requestData(1));
+        this.btn.btnR3.addEventListener('click', () => this.requestData(3));
+        this.btn.btnS1.addEventListener('click', () => this.sendValue(new Uint8Array([10])));
+        this.btn.btnS2.addEventListener('click', () => this.sendString("Hello BLE!"));
+        // this.btn.btnS3.addEventListener('click', () => this.requestData(1));
     }
 
     getServiceUUID() {
@@ -294,6 +327,10 @@ class UniCom {
             console.log("UniCom notifications stopped.");
         }
     }
+};
+
+class MyPasswordManager {
+
 };
 
 class WebBLE {
@@ -324,6 +361,8 @@ class WebBLE {
             disconnectButton : document.getElementById('disconnectBleButton'),
             onButton : document.getElementById('onButton'),
             offButton : document.getElementById('offButton'),
+            fetchOn : document.getElementById('fetchOn'),
+            fetchOff : document.getElementById('fetchOff'),
             retrievedValue : document.getElementById('valueContainer'),
             latestValueSent : document.getElementById('valueSent'),
             bleStateContainer : document.getElementById('bleState'),
