@@ -6,25 +6,26 @@
 void MyPasswordManager::init() {
     DEBUG_MSG("Initializing MyPasswordManager...\n");
     uniCom.init();
-    uniCom.addCallback([=](String &str) {readValue(str);});
+    uniCom.addCallback([=](UniCom::Packet packet) {getPacket(packet);});
     // Alternatively use bind:
-    // uniCom.addCallback(std::bind(&MyPasswordManager::readValue, &myPasswordManager, std::placeholders::_1));
+    // uniCom.addCallback(std::bind(&MyPasswordManager::getPacket, &myPasswordManager, std::placeholders::_1));
 }
 
-void MyPasswordManager::readValue(String &value) {
+void MyPasswordManager::getPacket(UniCom::Packet packet) {
     DEBUG_MSG("Read value...\n");
-    if(value.length() <= 0) {
-        DEBUG_MSG("Invalid message received. (Insufficient lenght.)\n");
-        return;
-    }
     if(!MyBLEServer::isAuthenticated) {
         DEBUG_MSG("Device is not authenticated!\n");
         return;
     }
 
-    DEBUG_MSG("Message received: %s\n", value.c_str());
+    if(packet.data.size() == 0) {
+        DEBUG_MSG("Invalid message received. (Insufficient lenght.)\n");
+        return;
+    }
 
-    int msgType = static_cast<int>(value[0]);
+    DEBUG_MSG("Message received: %s\n", packet.data.data());
+
+    int msgType = packet.data[1];
 
     typeDecoder(msgType);
 }
@@ -32,25 +33,27 @@ void MyPasswordManager::readValue(String &value) {
 void MyPasswordManager::typeDecoder(int type) {
     DEBUG_MSG("Type: %d\n", type);
     String val;
-    vector<uint8_t> value;
+    std::vector<uint8_t> value;
     switch(type) {
         case 1: 
-            // val = "Button A";
-            val = "1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000";
-            DEBUG_MSG("Sent value: %s\n", val.c_str());
-            uniCom.sendString(val);
-            break;
-        case 2:
-            DEBUG_MSG("Sending user info...\n");
-            sendUserInfo();
-            break;
-        case 3:
-            DEBUG_MSG("Sending password...\n");
-            // sendPassword();
+            DEBUG_MSG("Sending value...\n");
             value.push_back('a');
             value.push_back('b');
             value.push_back('c');
             uniCom.sendValue(value);
+            break;
+        case 2:
+            DEBUG_MSG("Sending string...\n");
+            val = "1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000";
+            DEBUG_MSG("Sent value: %s\n", val.c_str());
+            uniCom.sendString(val);
+            break;
+        case 3:
+            DEBUG_MSG("Sending json...\n");
+            sendUserInfo();
+
+            // sendPassword();
+            
             break;
         default:
             DEBUG_MSG("Unknown button\n");

@@ -8,7 +8,7 @@ private:
 public:
     MyPasswordManager(UniCom &uniCom) : uniCom(uniCom) {}
     void init();
-    void readValue(String &value);
+    void getPacket(UniCom::Packet packet);
     void typeDecoder(int type);
     void sendPassword();
     void sendUserInfo();
