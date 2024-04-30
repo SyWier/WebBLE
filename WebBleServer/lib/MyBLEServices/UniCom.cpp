@@ -54,6 +54,7 @@ void UniCom::receiveData(vector<uint8_t> &value) {
 
     switch(dataType) {
         case VALUE:
+            // Send data, no other packeges expected
             packet.dataType = VALUE;
             packet.data.assign(value.begin()+4, value.end());
             callback(packet);
@@ -188,6 +189,10 @@ void UniCom::sendPacket(PacketHeader &header, PacketHeaderData &headerData) {
         return;
     }
 
+    if(header.dataType == STRING || header.dataType == JSON) {
+        sendState.isInProgress = true;
+    }
+
     // Calculate packet size
     size_t length = PACKET_HEADER_SIZE + getFlagSize(header) + headerData.data.size();
     if(length > att_mtu - ATT_HEADER) {
@@ -290,7 +295,6 @@ void UniCom::sendString(String &str) {
 
     sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
     sendState.pos = 0;
-    sendState.isInProgress = true;
 
     sendPacket(packetHeader, packetHeaderData);
 }

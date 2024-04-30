@@ -25,14 +25,13 @@ void MyPasswordManager::getPacket(UniCom::Packet packet) {
 
     DEBUG_MSG("Message received:");
 
-    int msgType = packet.dataType;
-
     switch(packet.dataType) {
         case UniCom::VALUE:
             for(int i = 0; i<packet.data.size(); i++) {
                 DEBUG_MSG(" %02x", packet.data[i]);
             }
             DEBUG_MSG("\n");
+            typeDecoder(packet.data[0]);
             break;
         case UniCom::STRING:
         case UniCom::JSON:
@@ -43,7 +42,6 @@ void MyPasswordManager::getPacket(UniCom::Packet packet) {
             return;
     }
 
-    typeDecoder(msgType);
 }
 
 void MyPasswordManager::typeDecoder(int type) {
@@ -52,24 +50,17 @@ void MyPasswordManager::typeDecoder(int type) {
     std::vector<uint8_t> value;
     switch(type) {
         case 1: 
-            DEBUG_MSG("Sending value...\n");
             value.push_back('a');
             value.push_back('b');
             value.push_back('c');
             uniCom.sendValue(value);
             break;
         case 2:
-            DEBUG_MSG("Sending string...\n");
             val = "1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000";
-            DEBUG_MSG("Sent value: %s\n", val.c_str());
             uniCom.sendString(val);
             break;
         case 3:
-            DEBUG_MSG("Sending json...\n");
             sendUserInfo();
-
-            // sendPassword();
-            
             break;
         default:
             DEBUG_MSG("Unknown button\n");
