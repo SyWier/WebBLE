@@ -22,7 +22,7 @@ private:
 public:
     typedef enum : uint8_t {
         PACKET_DATA = 0x0D,
-        PACKED_EXT_DATA = 0xED,
+        PACKET_EXT_DATA = 0xED,
     } PacketType;
 
     typedef enum : uint8_t {
@@ -51,20 +51,26 @@ private:
         vector<uint8_t> data;
     } PacketHeaderData;
 
-    typedef enum : uint8_t {
-        IDLE = 0,
-        SENDING = 1,
-        RECEIVING = 2,
-    } ProgressType;
+    // typedef enum : uint8_t {
+    //     IDLE = 0,
+    //     SENDING = 1,
+    //     RECEIVING = 2,
+    // } ProgressType;
 
     typedef struct {
-        ProgressType isInProgress;
+        bool isInProgress;
         vector<uint8_t> buffer;
         uint32_t pos;
+    } SendingState; 
+    SendingState sendState;
+
+    typedef struct {
+        bool isInProgress;
+        vector<uint8_t> buffer;
         uint8_t count;
         uint8_t counter;
-    } Communicationtate; 
-    Communicationtate state;
+    } ReceivingState; 
+    ReceivingState recState;
 
 public :
     // It may be expanded with other data, based on flags
@@ -90,6 +96,9 @@ public:
     UniCom(int bufferSize = 2000);
     void init();
     void addCallback(std::function<void(Packet packet)> callback);
+
+    void receiveData(vector<uint8_t> &value);
+    void receiveExtData(vector<uint8_t> &value);
 
     void sendValue(vector<uint8_t> &value);
     void sendValue(uint8_t* value, size_t length);

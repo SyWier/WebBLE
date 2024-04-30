@@ -4,7 +4,7 @@ void UniCom::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code)
     String str;
     switch(s) {
         case SUCCESS_INDICATE:
-            if(state.isInProgress == SENDING) {
+            if(sendState.isInProgress) {
                 sendExtPacket();
             }
             str = "SUCCESS_INDICATE";
@@ -27,49 +27,66 @@ void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
         return;
     }
 
-    if(state.isInProgress == SENDING) {
-        DEBUG_MSG("Sending already in progress.\n");
+    vector<uint8_t> value = pCharacteristic->getValue();
+
+    PacketType packetType = (PacketType)value[0];
+    switch(packetType) {
+        case PACKET_DATA:
+            receiveData(value);
+            break;
+        case PACKET_EXT_DATA:
+            receiveExtData(value);
+            break;
+        default:
+            DEBUG_MSG("Unkown packet type\n");
+            return;
+    }
+}
+
+void UniCom::receiveData(vector<uint8_t> &value) {
+    if(recState.isInProgress) {
+        DEBUG_MSG("Transaction is already in progress!\n");
         return;
     }
 
-    vector<uint8_t> value = pCharacteristic->getValue();
-    DEBUG_MSG("Received value:");
-    for(int i = 0; i<value.size(); i++) {
-        DEBUG_MSG(" %02x", value[i]);
+    Packet packet;
+    DataType dataType = (DataType)value[1];
+
+    switch(dataType) {
+        case VALUE:
+            packet.dataType = VALUE;
+            packet.data.assign(value.begin()+4, value.end());
+            callback(packet);
+            return;
+        case STRING:
+        case JSON:
+            recState.isInProgress = true;
+            recState.count = value[3];
+            recState.counter = 0;
+            recState.buffer.clear();
+            return;
+        default:
+            DEBUG_MSG("Unkown data type\n");
+            return;
     }
-    DEBUG_MSG("\n");
+}
 
-    Packet packet = {
-        .dataType = VALUE,
-        .extraData = {.id = 0},
-    };
-    packet.data = pCharacteristic->getValue();
-    packet.data.push_back('\0');
+void UniCom::receiveExtData(vector<uint8_t> &value) {
+    recState.buffer.insert(recState.buffer.end(), value.begin()+1, value.end());
 
-    callback(packet);
+    recState.counter++;
+    if(recState.counter == recState.count) {
+        Packet packet = {
+            .dataType = STRING,
+            .extraData = {.id = 0},
+        };
+        packet.data = recState.buffer;
+        packet.data.push_back('\0');
 
-    // DEBUG_MSG("Value received: %s.\n", str.c_str());
+        callback(packet);
 
-    // if(str.length() > state.length) {
-    //     DEBUG_MSG("String is larger then buffer!\n");
-    //     return;
-    // }
-    // memcpy(state.buffer, str.c_str(), str.length());
-
-
-    // char type = str[0];
-    // switch(type) {
-    //     case 'O':
-    //         inBuffer += str.substring(1);
-    //         break;
-    //     case 'X':
-    //         inBuffer += str.substring(1);
-    //         callback(inBuffer);
-    //         inBuffer = "";
-    //         break;
-    //     default:
-    //         DEBUG_MSG("Unknown packet type.\n");
-    // }
+        recState.isInProgress = false;
+    }
 }
 
 // Universal communication
@@ -80,11 +97,14 @@ UniCom::UniCom(int bufferSize /* 2000 */) {
     pService = nullptr;
     pCharacteristic = nullptr;
 
-    state.isInProgress = IDLE;
-    state.buffer.reserve(bufferSize);
-    state.pos = 0;
-    state.count = 0;
-    state.counter = 0;
+    sendState.buffer.reserve(bufferSize);
+    sendState.pos = 0;
+    sendState.isInProgress = false;
+
+    recState.buffer.reserve(bufferSize);
+    recState.count = 0;
+    recState.counter = 0;
+    recState.isInProgress = false;
 
     init();
 }
@@ -163,6 +183,10 @@ size_t UniCom::getFlagSize(PacketHeader &header) {
 
 void UniCom::sendPacket(PacketHeader &header, PacketHeaderData &headerData) {
     DEBUG_MSG("Sending packet...\n");
+    if(sendState.isInProgress) {
+        DEBUG_MSG("Transaction is already in progress!\n");
+        return;
+    }
 
     // Calculate packet size
     size_t length = PACKET_HEADER_SIZE + getFlagSize(header) + headerData.data.size();
@@ -206,40 +230,29 @@ void UniCom::sendExtPacket() {
     DEBUG_MSG("Sending ext packet...\n");
 
     // Temporary variable for packet data
-    int payloadSize = att_mtu - ATT_HEADER - 1;
-    int length;
-    uint8_t* data = new uint8_t[payloadSize + 1];
+    uint32_t payloadSize = att_mtu - ATT_HEADER - 1;
+    uint32_t length = min(payloadSize, sendState.buffer.size() - sendState.pos);
+    uint8_t* data = new uint8_t[length + 1];
 
     // Packet type
-    data[0] = PACKED_EXT_DATA;
-
-    // Test if we run out of buffer
-    if(state.pos + payloadSize <= state.buffer.size()) {
-        length = payloadSize;
-    } else {
-        length = state.buffer.size() - state.pos;
-    }
+    data[0] = PACKET_EXT_DATA;
 
     // Set packet data
-    memcpy(data + 1, state.buffer.data() + state.pos, length);
-    state.pos += length;
+    memcpy(data + 1, sendState.buffer.data() + sendState.pos, length);
+    sendState.pos += length;
 
     pCharacteristic->indicate(data, length+1);
 
     // Free up temporary variable
     delete data;
 
-    if(state.pos == state.buffer.size()) {
-        state.isInProgress = IDLE;
+    if(sendState.pos == sendState.buffer.size()) {
+        sendState.isInProgress = false;
     }
 }
 
 void UniCom::sendValue(uint8_t* value, size_t length) {
     DEBUG_MSG("Sending value...\n");
-    if(state.isInProgress) {
-        DEBUG_MSG("Transaction is already in progress!\n");
-        return;
-    }
 
     PacketHeader header = {
         .packetType = PACKET_DATA,
@@ -260,12 +273,8 @@ void UniCom::sendValue(vector<uint8_t> &value) {
 
 void UniCom::sendString(String &str) {
     DEBUG_MSG("Sending String...\n");
-    if(state.isInProgress) {
-        DEBUG_MSG("Transaction is already in progress!\n");
-        return;
-    }
 
-    if(str.length() > state.buffer.capacity()) {
+    if(str.length() > sendState.buffer.capacity()) {
         DEBUG_MSG("String is larger then buffer!\n");
         return;
     }
@@ -279,9 +288,9 @@ void UniCom::sendString(String &str) {
 
     PacketHeaderData packetHeaderData;
 
-    state.buffer.assign(str.c_str(), str.c_str() + str.length());
-    state.pos = 0;
-    state.isInProgress = SENDING;
+    sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
+    sendState.pos = 0;
+    sendState.isInProgress = true;
 
     sendPacket(packetHeader, packetHeaderData);
 }

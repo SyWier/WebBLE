@@ -23,9 +23,25 @@ void MyPasswordManager::getPacket(UniCom::Packet packet) {
         return;
     }
 
-    DEBUG_MSG("Message received: %s\n", packet.data.data());
+    DEBUG_MSG("Message received:");
 
-    int msgType = packet.data[1];
+    int msgType = packet.dataType;
+
+    switch(packet.dataType) {
+        case UniCom::VALUE:
+            for(int i = 0; i<packet.data.size(); i++) {
+                DEBUG_MSG(" %02x", packet.data[i]);
+            }
+            DEBUG_MSG("\n");
+            break;
+        case UniCom::STRING:
+        case UniCom::JSON:
+            DEBUG_MSG(" %s\n", packet.data.data());
+            break;
+        default:
+            DEBUG_MSG("Unknown data type.\n");
+            return;
+    }
 
     typeDecoder(msgType);
 }
