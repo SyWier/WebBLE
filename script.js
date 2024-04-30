@@ -104,41 +104,7 @@ class RNTService {
 
 class UniCom {
     constructor(webBLE) {
-        // Get site dom
-        this.btn = webBLE.btn;
-
-        // Unicom service
-        this.uniCom = {
-            serviceUUID : '19b20000-e8f2-537e-4f6c-d104768a1214',
-            service : null,
-            charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
-            char : null,
-        };
-
-        this.progressType = {
-            idle : 0,
-            sending : 1,
-            receiving : 2
-        };
-
-        this.send = {
-            buffer : new Uint8Array(2000),
-            isInProgress : false,
-            pos : 0,
-        };
-
-        this.receive = {
-            buffer : new Uint8Array(2000),
-            isInProgress : false,
-            count : 0,
-            counter : 0
-        };
-
-        this.buffer = '';
-        this.counter = 0;
-        this.isInProgress = this.progressType.idle;
-        this.data_size = 497 - 1; // UniCom Header size is 1
-
+        // "Enums"
         this.packetType = {
             data : 0x0D,
             extData : 0xED
@@ -155,6 +121,34 @@ class UniCom {
             id_flag : 1,
             len_flag : 2
         };
+
+        // Get site dom
+        this.btn = webBLE.btn;
+
+        // Unicom service
+        this.uniCom = {
+            serviceUUID : '19b20000-e8f2-537e-4f6c-d104768a1214',
+            service : null,
+            charUUID : '19b20001-e8f2-537e-4f6c-d104768a1214',
+            char : null,
+        };
+
+        this.send = {
+            buffer : new Uint8Array(2000),
+            isInProgress : false,
+            pos : 0,
+        };
+
+        this.receive = {
+            buffer : new Uint8Array(2000),
+            isInProgress : false,
+            pos : 0,
+            count : 0,
+            counter : 0
+        };
+
+        // this.data_size = 497 - 1; // UniCom Header size is 1
+        this.data_size = 99; // UniCom Header size is 1
     }
 
     async getService(bleServer) {
@@ -188,14 +182,6 @@ class UniCom {
         };
     }
 
-    pack(str, pos, size) {
-        if(pos + size < str.length) {
-            return "O" + str.substr(pos, size);
-        } else {
-            return "X" + str.substr(pos, size);
-        }
-    }
-
     bufferToHex(buffer) {
         return [...new Uint8Array (buffer)]
             .map (b => b.toString (16).padStart (2, "0"))
@@ -203,9 +189,6 @@ class UniCom {
     }
 
     handleReceived(event) {
-        if(this.isInProgress == this.progressType.sending) {
-            console.log("Cannot receive value! ")
-        }
         // Convert data
         let value = new Uint8Array(event.target.value.buffer);
         let received = this.unpack(value);
@@ -235,92 +218,125 @@ class UniCom {
                 this.proccessValue(received.data);
                 break;
             case this.dataType.string:
-                this.proccessString();
+                this.proccessString(received.header.count);
                 break;
             case this.dataType.json:
                 this.proccessJSON();
                 break;
             default:
                 console.log("Error: Unknown data type!");
-
         }
     }
 
     handleExtData(value) {
-        this.buffer += value.subarray(4);
-        this.counter += 1;
-        this.btn.response.innerHTML = this.uniCom.buffer;
-        this.uniCom.buffer = '';
+        console.log("Received ext data...");
+
+        let subarr = value.subarray(1);
+        this.receive.buffer.set(subarr, this.receive.pos);
+        this.receive.pos += subarr.length;
+
+        this.receive.counter += 1;
+        if(this.receive.count == this.receive.counter) {
+            this.btn.response.innerHTML = new TextDecoder().decode(this.receive.buffer);
+            console.log(new TextDecoder().decode(this.receive.buffer));
+        }
     }
 
     proccessValue(data) {
-        this.buffer = data;
-        this.btn.response.innerHTML = this.buffer;
+        this.receive.buffer = data;
+        this.btn.response.innerHTML = this.receive.buffer;
     }
 
-    proccessString() {
-        this.buffer = '';
-        this.counter = 0;
-        this.isInProgress = true;
+    proccessString(count) {
+        this.receive.buffer = new Uint8Array(2000);
+        this.pos = 0;
+        this.receive.count = count;
+        this.receive.counter = 0;
+        this.receive.isInProgress = true;
+        this.btn.response.innerHTML = 'In progess...';
     }
 
     proccessJSON() {
-        this.buffer = '';
-        this.counter = 0;
-        this.isInProgress = true;
+        this.receive.buffer = '';
+        this.receive.count = 0;
+        this.receive.counter = 0;
+        this.receive.isInProgress = true;
+        this.btn.response.innerHTML = 'In progess...';
+    }
+
+    async sendPacket(header, value = null) {
+        if(this.isInProgress) {
+            console.log("Cannot send packet! A transaction is already in progress.");
+            return;
+        }
+
+        let length = (value == null) ? 4 : 4+value.length;
+
+        let data = new Int8Array(length);
+        data[0] = this.packetType.data;
+        data[1] = header.dataType;
+        data[2] = header.flags;
+        data[3] = header.count;
+        if(value != null) {
+            data.set(value, 4);
+        }
+
+        console.log("Sending value (HEX): ", this.bufferToHex(data));
+        await this.uniCom.char.writeValue(data);
+    }
+
+    async sendExtPacket(value) {
+        let data = new Uint8Array(1 + value.length);
+        data[0] = this.packetType.extData;
+        data.set(value, 1);
+        await this.uniCom.char.writeValue(data);
     }
 
     async sendValue(value) {
         console.log("Sending value...");
-        if(this.isInProgress != this.progressType.idle) {
+        if(this.send.isInProgress) {
             console.log("Cannot send value! A transaction is already in progress!");
             return;
         }
-        this.isInProgress = this.progressType.sending;
+        this.send.isInProgress = true;
 
-        let data = new Int8Array(4+value.length);
-        data[0] = this.packetType.data;
-        data[1] = this.dataType.value;
-        data[2] = this.flags.no_flag;
-        data[3] = 0;
-        data.set(value, 4);
-        console.log("Sending value (HEX): ", this.bufferToHex(data));
+        let header = {
+            dataType : this.dataType.value,
+            flags : this.flags.no_flag,
+            count : 0,
+        };
 
-        await this.uniCom.char.writeValue(data);
+        await this.sendPacket(header, value);
 
-        this.isInProgress = this.progressType.idle;
+        this.send.isInProgress = false;
     }
 
     async sendString(string) {
         console.log("Sending string...");
-        if(this.isInProgress != this.progressType.idle) {
+        if(this.isInProgress) {
             console.log("Cannot send string! A transaction is already in progress!");
             return;
         }
-        this.isInProgress = this.progressType.sending;
+        this.send.isInProgress = true;
+
+        let header = {
+            dataType : this.dataType.string,
+            flags : this.flags.no_flag,
+            count : Math.ceil(string.length/this.data_size),
+        };
+
+        await this.sendPacket(header);
 
         let pos = 0;
-        let data_size = 100; // this.data_size for original
-
-        let data = new Int8Array(4);
-        data[0] = this.packetType.data;
-        data[1] = this.dataType.string;
-        data[2] = this.flags.no_flag;
-        data[3] = Math.ceil(string.length/data_size);
-        await this.uniCom.char.writeValue(data);
 
         while(pos < string.length) {
-            console.log("Sending packet...");
-
-            let length = Math.min(data_size, string.length-pos);
-            let segment = new Uint8Array(length + 1);
-            segment[0] = this.packetType.extData;
-            segment.set(new TextEncoder().encode(string.substr(pos, length)), 1);
+            let length = Math.min(this.data_size, string.length-pos);
+            let substr = string.substr(pos, length);
             pos += length;
-            await this.uniCom.char.writeValue(segment);
+            await this.sendExtPacket(new TextEncoder().encode(substr));
         }
 
-        this.isInProgress = this.progressType.idle;
+        this.send.isInProgress = false;
     }
 
     async requestData(value) {
@@ -344,7 +360,8 @@ class UniCom {
         this.btn.btnR2.addEventListener('click', () => this.requestData(2));
         this.btn.btnR3.addEventListener('click', () => this.requestData(3));
         this.btn.btnS1.addEventListener('click', () => this.sendValue(new Uint8Array([10])));
-        this.btn.btnS2.addEventListener('click', () => this.sendString("Hello BLE!"));
+        this.btn.btnS2.addEventListener('click', () => this.sendString("1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000"));
+        // this.btn.btnS2.addEventListener('click', () => this.sendString("Hello BLE!"));
         // this.btn.btnS3.addEventListener('click', () => this.requestData(1));
     }
 
