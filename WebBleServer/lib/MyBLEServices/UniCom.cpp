@@ -29,6 +29,11 @@ void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
 
     vector<uint8_t> value = pCharacteristic->getValue();
 
+    if(value.size() == 0) {
+        DEBUG_MSG("Empty value received.\n");
+        return;
+    }
+
     PacketType packetType = (PacketType)value[0];
     switch(packetType) {
         case PACKET_DATA:
@@ -173,7 +178,8 @@ void UniCom::addCallback(std::function<void(Packet packet)> callback) {
 // }
 
 uint8_t UniCom::getPacketCount(uint32_t length) {
-    return length/att_mtu + (length%att_mtu != 0);
+    uint32_t payloadSize = att_mtu - ATT_HEADER - 1;
+    return length/payloadSize + (length%payloadSize != 0);
 }
 
 size_t UniCom::getFlagSize(PacketHeader &header) {
