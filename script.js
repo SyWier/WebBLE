@@ -119,7 +119,20 @@ class UniCom {
             idle : 0,
             sending : 1,
             receiving : 2
-        }
+        };
+
+        this.send = {
+            buffer : new Uint8Array(2000),
+            isInProgress : false,
+            pos : 0,
+        };
+
+        this.receive = {
+            buffer : new Uint8Array(2000),
+            isInProgress : false,
+            count : 0,
+            counter : 0
+        };
 
         this.buffer = '';
         this.counter = 0;
@@ -190,8 +203,15 @@ class UniCom {
     }
 
     handleReceived(event) {
+        if(this.isInProgress == this.progressType.sending) {
+            console.log("Cannot receive value! ")
+        }
         // Convert data
         let value = new Uint8Array(event.target.value.buffer);
+        let received = this.unpack(value);
+        if(received.header.count > 0) {
+
+        }
         let packetType = value[0];
         console.log("Received value (HEX): ", this.bufferToHex(value));
 
@@ -252,6 +272,12 @@ class UniCom {
 
     async sendValue(value) {
         console.log("Sending value...");
+        if(this.isInProgress != this.progressType.idle) {
+            console.log("Cannot send value! A transaction is already in progress!");
+            return;
+        }
+        this.isInProgress = this.progressType.sending;
+
         console.log(value.length);
         let data = new Int8Array(4+value.length);
         data[0] = this.packetType.data;
@@ -262,10 +288,17 @@ class UniCom {
         console.log("Value (HEX): ", this.bufferToHex(data));
 
         await this.uniCom.char.writeValue(data);
+
+        this.isInProgress = this.progressType.idle;
     }
 
     async sendString(string) {
         console.log("Sending string...");
+        if(this.isInProgress != this.progressType.idle) {
+            console.log("Cannot send string! A transaction is already in progress!");
+            return;
+        }
+        this.isInProgress = this.progressType.sending;
 
         let pos = 0;
         let data_size = 100; // this.data_size for original
@@ -287,6 +320,8 @@ class UniCom {
             pos += length;
             await this.uniCom.char.writeValue(segment);
         }
+
+        this.isInProgress = this.progressType.idle;
     }
 
     async requestData(value) {
