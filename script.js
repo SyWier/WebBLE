@@ -196,6 +196,7 @@ class UniCom {
         if(received.header.count > 0) {
 
         }
+        
         let packetType = value[0];
         console.log("Received value (HEX): ", this.bufferToHex(value));
 
@@ -274,21 +275,52 @@ class UniCom {
         this.btn.response.innerHTML = 'In progess...';
     }
 
-    async sendPacket(header, value = null) {
+    getFlagSize(flags) {
+        // Unmap additional size based on flags selected
+        let unmapFlag = [0, 2, 4, 6];
+        return unmapFlag[flags];
+    }
+
+    getDataSize(headerData) {
+        if(headerData == null) {
+            return 0;
+        }
+
+        if(headerData.data == null) {
+            return 0;
+        }
+
+        return headerData.data.length;
+    }
+
+    async sendPacket(header, headerData = null) {
         if(this.isInProgress) {
             console.log("Cannot send packet! A transaction is already in progress.");
             return;
         }
 
-        let length = (value == null) ? 4 : 4+value.length;
+        let length = 4 + this.getFlagSize(header.flags) + this.getDataSize(headerData);
+        let offset = 0;
 
         let data = new Int8Array(length);
         data[0] = this.packetType.data;
         data[1] = header.dataType;
         data[2] = header.flags;
         data[3] = header.count;
-        if(value != null) {
-            data.set(value, 4);
+        offset += 4;
+
+        if(header.flags & this.flags.id_flag) {
+            data.set(headerData.id, offset);
+            offset += 2;
+        }
+
+        if(header.flags & this.flags.len_flag) {
+            data.set(headerData.length, offset);
+            offset += 4;
+        }
+
+        if(header.dataType == this.dataType.value) {
+            data.set(headerData.data, offset);
         }
 
         console.log("Sending value (HEX): ", this.bufferToHex(data));
@@ -302,7 +334,13 @@ class UniCom {
         await this.uniCom.char.writeValue(data);
     }
 
-    async sendValue(value) {
+    copyExtraToHeader(header, headerData, extraData) {
+        header.flags = extraData.flags;
+        headerData.id = extraData.id;
+        headerData.length = extraData.length;
+    }
+
+    async sendValue(value, extraData = null) {
         console.log("Sending value...");
 
         if(this.send.isInProgress) {
@@ -318,7 +356,14 @@ class UniCom {
             count : 0,
         };
 
-        await this.sendPacket(header, value);
+        let headerData = {
+            data : value
+        };
+        if(extraData != null) {
+            this.copyExtraToHeader(header, headerData, extraData);
+        }
+
+        await this.sendPacket(header, headerData);
 
         this.send.isInProgress = false;
     }
@@ -334,7 +379,7 @@ class UniCom {
         }
     }
 
-    async sendString(string) {
+    async sendString(string, extraData = null) {
         console.log("Sending string...");
 
         if(this.isInProgress) {
@@ -350,13 +395,18 @@ class UniCom {
             count : Math.ceil(string.length/this.data_size),
         };
 
-        await this.sendPacket(header);
+        let headerData = { data : null };
+        if(extraData != null) {
+            this.copyExtraToHeader(header, headerData, extraData);
+        }
+
+        await this.sendPacket(header, headerData);
         await this.sendStream(new TextEncoder().encode(string));
 
         this.send.isInProgress = false;
     }
 
-    async sendJSON(object) {
+    async sendJSON(object, extraData = null) {
         console.log("Sending json...");
 
         this.send.isInProgress = true;
@@ -369,8 +419,12 @@ class UniCom {
             count : Math.ceil(serialized.length/this.data_size),
         };
 
-        
-        await this.sendPacket(header);
+        let headerData = { data : null };
+        if(extraData != null) {
+            this.copyExtraToHeader(header, headerData, extraData);
+        }
+
+        await this.sendPacket(header, headerData);
         await this.sendStream(new TextEncoder().encode(serialized));
 
         this.send.isInProgress = false;
@@ -392,12 +446,31 @@ class UniCom {
         }
     }
 
+    numToUint8Array(num, bytes = 4) {
+        let arr = new Uint8Array(bytes);
+      
+        for (let i = 0; i < bytes; i++) {
+          arr[i] = num % 256;
+          num = Math.floor(num / 256);
+        }
+      
+        return arr;
+      }
+
     bindButtons() {
         this.btn.btnR1.addEventListener('click', () => this.requestData(1));
         this.btn.btnR2.addEventListener('click', () => this.requestData(2));
         this.btn.btnR3.addEventListener('click', () => this.requestData(3));
-        this.btn.btnS1.addEventListener('click', () => this.sendValue(new Uint8Array([10])));
-        this.btn.btnS2.addEventListener('click', () => this.sendString("1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000"));
+        let extraData1 = {
+            flags : this.flags.id_flag,
+            id : this.numToUint8Array(123, 2),
+        };
+        this.btn.btnS1.addEventListener('click', () => this.sendValue(new Uint8Array([10]), extraData1));
+        let extraData2 = {
+            flags : this.flags.len_flag,
+            length : this.numToUint8Array(700, 4),
+        };
+        this.btn.btnS2.addEventListener('click', () => this.sendString("1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000", extraData2));
         // this.btn.btnS2.addEventListener('click', () => this.sendString("Hello BLE!"));
         let object = {
             username : 'Sany9',
