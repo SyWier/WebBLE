@@ -175,14 +175,6 @@ size_t UniCom::getFlagSize(PacketHeader &header) {
 
 void UniCom::sendPacket(PacketHeader &header, PacketHeaderData &headerData) {
     DEBUG_MSG("Sending packet...\n");
-    if(sendState.isInProgress) {
-        DEBUG_MSG("Transaction is already in progress!\n");
-        return;
-    }
-
-    if(header.dataType == STRING || header.dataType == JSON) {
-        sendState.isInProgress = true;
-    }
 
     // Calculate packet size
     size_t length = PACKET_HEADER_SIZE + getFlagSize(header) + headerData.data.size();
@@ -250,6 +242,11 @@ void UniCom::sendExtPacket() {
 void UniCom::sendValue(uint8_t* value, size_t length) {
     DEBUG_MSG("Sending value...\n");
 
+    if(sendState.isInProgress) {
+        DEBUG_MSG("Transaction is already in progress!\n");
+        return;
+    }
+
     PacketHeader header = {
         .packetType = PACKET_DATA,
         .dataType = VALUE,
@@ -270,6 +267,11 @@ void UniCom::sendValue(vector<uint8_t> &value) {
 void UniCom::sendString(String &str) {
     DEBUG_MSG("Sending String...\n");
 
+    if(sendState.isInProgress) {
+        DEBUG_MSG("Transaction is already in progress!\n");
+        return;
+    }
+
     if(str.length() > sendState.buffer.capacity()) {
         DEBUG_MSG("String is larger then buffer!\n");
         return;
@@ -286,15 +288,44 @@ void UniCom::sendString(String &str) {
 
     sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
     sendState.pos = 0;
+    sendState.isInProgress = true;
+
 
     sendPacket(packetHeader, packetHeaderData);
 }
 
 void UniCom::sendJSON(JsonDocument &json) {
     DEBUG_MSG("Sending JSON...\n");
+
+    if(sendState.isInProgress) {
+        DEBUG_MSG("Transaction is already in progress!\n");
+        return;
+    }
+    
     // Generate the minified JSON and send it
     String str;
     serializeJson(json, str);
+
+    if(str.length() > sendState.buffer.capacity()) {
+        DEBUG_MSG("JSON is larger then buffer!\n");
+        return;
+    }
+
     DEBUG_MSG("Serialized JSON: %s\n", str.c_str());
-    sendString(str);
+
+    PacketHeader packetHeader = {
+        .packetType = PACKET_DATA,
+        .dataType = JSON,
+        .flags = NO_FLAG,
+        .count = getPacketCount(str.length()),
+    };
+
+    PacketHeaderData packetHeaderData;
+
+    sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
+    sendState.pos = 0;
+    sendState.isInProgress = true;
+
+
+    sendPacket(packetHeader, packetHeaderData);
 }

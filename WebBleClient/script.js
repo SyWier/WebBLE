@@ -140,6 +140,7 @@ class UniCom {
         };
 
         this.receive = {
+            dataType : 0,
             buffer : new Uint8Array(2000),
             isInProgress : false,
             pos : 0,
@@ -213,15 +214,16 @@ class UniCom {
 
     handleData(value) {
         let received = this.unpack(value);
+        let header = received.header;
         switch(received.header.dataType) {
             case this.dataType.value:
                 this.proccessValue(received.data);
                 break;
             case this.dataType.string:
-                this.proccessString(received.header.count);
+                this.proccessStream(header.dataType, header.count);
                 break;
             case this.dataType.json:
-                this.proccessJSON();
+                this.proccessStream(header.dataType, header.count);
                 break;
             default:
                 console.log("Error: Unknown data type!");
@@ -237,8 +239,23 @@ class UniCom {
 
         this.receive.counter += 1;
         if(this.receive.count == this.receive.counter) {
-            this.btn.response.innerHTML = new TextDecoder().decode(this.receive.buffer);
-            console.log(new TextDecoder().decode(this.receive.buffer));
+            this.receive.buffer = this.receive.buffer.subarray(0, this.receive.pos);
+
+            switch(this.receive.dataType) {
+                case this.dataType.string:
+                    this.btn.response.innerHTML = new TextDecoder().decode(this.receive.buffer);
+                    break;
+                case this.dataType.json:
+                    let jsonString = new TextDecoder().decode(this.receive.buffer);
+                    let json = JSON.parse(jsonString);
+                    let jsonPretty = JSON.stringify(json, null, 2);
+                    this.btn.response.innerHTML = jsonPretty;
+                    console.log(json);
+                    break;
+                default:
+                    console.log("Unkown data type received");
+                    console.log(this.bufferToHex(this.receive.buffer));
+            }
         }
     }
 
@@ -247,18 +264,11 @@ class UniCom {
         this.btn.response.innerHTML = this.receive.buffer;
     }
 
-    proccessString(count) {
+    proccessStream(dataType, count) {
+        this.receive.dataType = dataType;
         this.receive.buffer = new Uint8Array(2000);
-        this.pos = 0;
+        this.receive.pos = 0;
         this.receive.count = count;
-        this.receive.counter = 0;
-        this.receive.isInProgress = true;
-        this.btn.response.innerHTML = 'In progess...';
-    }
-
-    proccessJSON() {
-        this.receive.buffer = '';
-        this.receive.count = 0;
         this.receive.counter = 0;
         this.receive.isInProgress = true;
         this.btn.response.innerHTML = 'In progess...';
@@ -294,10 +304,12 @@ class UniCom {
 
     async sendValue(value) {
         console.log("Sending value...");
+
         if(this.send.isInProgress) {
             console.log("Cannot send value! A transaction is already in progress!");
             return;
         }
+
         this.send.isInProgress = true;
 
         let header = {
@@ -311,12 +323,25 @@ class UniCom {
         this.send.isInProgress = false;
     }
 
+    async sendStream(data) {
+        let pos = 0;
+
+        while(pos < data.length) {
+            let length = Math.min(this.data_size, data.length-pos);
+            let subarr = data.subarray(pos, pos+length);
+            pos += length;
+            await this.sendExtPacket(subarr);
+        }
+    }
+
     async sendString(string) {
         console.log("Sending string...");
+
         if(this.isInProgress) {
             console.log("Cannot send string! A transaction is already in progress!");
             return;
         }
+
         this.send.isInProgress = true;
 
         let header = {
@@ -326,15 +351,27 @@ class UniCom {
         };
 
         await this.sendPacket(header);
+        await this.sendStream(new TextEncoder().encode(string));
 
-        let pos = 0;
+        this.send.isInProgress = false;
+    }
 
-        while(pos < string.length) {
-            let length = Math.min(this.data_size, string.length-pos);
-            let substr = string.substr(pos, length);
-            pos += length;
-            await this.sendExtPacket(new TextEncoder().encode(substr));
-        }
+    async sendJSON(object) {
+        console.log("Sending json...");
+
+        this.send.isInProgress = true;
+
+        let serialized = JSON.stringify(object);
+
+        let header = {
+            dataType : this.dataType.json,
+            flags : this.flags.no_flag,
+            count : Math.ceil(serialized.length/this.data_size),
+        };
+
+        
+        await this.sendPacket(header);
+        await this.sendStream(new TextEncoder().encode(serialized));
 
         this.send.isInProgress = false;
     }
@@ -362,7 +399,12 @@ class UniCom {
         this.btn.btnS1.addEventListener('click', () => this.sendValue(new Uint8Array([10])));
         this.btn.btnS2.addEventListener('click', () => this.sendString("1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000"));
         // this.btn.btnS2.addEventListener('click', () => this.sendString("Hello BLE!"));
-        // this.btn.btnS3.addEventListener('click', () => this.requestData(1));
+        let object = {
+            username : 'Sany9',
+            email : 'sanyika02@gmail.com',
+            password : 'superS3cr3t'
+        };
+        this.btn.btnS3.addEventListener('click', () => this.sendJSON(object));
     }
 
     getServiceUUID() {
