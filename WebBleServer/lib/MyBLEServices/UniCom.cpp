@@ -35,6 +35,11 @@ void UniCom::onWrite(NimBLECharacteristic* pCharacteristic) {
         return;
     }
 
+    for(int i = 0; i<value.size(); i++) {
+        DEBUG_MSG(" %02x", value[i]);
+    }
+    DEBUG_MSG("\n");
+
     PacketType packetType = (PacketType)value[0];
     switch(packetType) {
         case PACKET_DATA:
