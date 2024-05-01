@@ -1,4 +1,5 @@
 #include <UniCom.h>
+
 // Universal communication callbacks
 void UniCom::onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code) {
     String str;
@@ -160,22 +161,6 @@ void UniCom::init() {
 void UniCom::addCallback(std::function<void(Packet packet)> callback) {
     this->callback = callback;
 }
-
-// void UniCom::sendPacket() {
-//     // Need to send out the string + att header (3 byte) in each packet
-//     DEBUG_MSG("Sending packet...\n");
-//     if(str_pos + packet_data < outBuffer.length()) {
-//         String str = "O" + outBuffer.substring(str_pos, str_pos + packet_data);
-//         str_pos += packet_data;
-//         pCharacteristic->indicate(str);
-//     } else {
-//         DEBUG_MSG("Lasts packet!\n");
-//         // Packet Header + Packet Data
-//         String str = "X" + outBuffer.substring(str_pos, str_pos + packet_data);
-//         pCharacteristic->indicate(str);
-//         isInProgress = false;
-//     }
-// }
 
 uint8_t UniCom::getPacketCount(uint32_t length) {
     uint32_t payloadSize = att_mtu - ATT_HEADER - 1;

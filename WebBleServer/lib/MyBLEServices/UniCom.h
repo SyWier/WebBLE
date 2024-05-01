@@ -97,9 +97,6 @@ public:
     void init();
     void addCallback(std::function<void(Packet packet)> callback);
 
-    void receiveData(vector<uint8_t> &value);
-    void receiveExtData(vector<uint8_t> &value);
-
     void sendValue(vector<uint8_t> &value);
     void sendValue(uint8_t* value, size_t length);
     void sendString(String &str);
@@ -110,6 +107,8 @@ private:
     size_t getFlagSize(PacketHeader &header);
     void sendPacket(PacketHeader &header, PacketHeaderData &headerData);
     void sendExtPacket();
+    void receiveData(vector<uint8_t> &value);
+    void receiveExtData(vector<uint8_t> &value);
 
     // Nimble callback functions
     void onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code);
