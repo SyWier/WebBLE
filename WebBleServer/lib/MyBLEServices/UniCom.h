@@ -75,7 +75,9 @@ private:
 public :
     // It may be expanded with other data, based on flags
     typedef struct {
+        PacketFlag flags;
         uint16_t id;
+        uint32_t length;
     } PacketExtraData;
 
     typedef struct {
@@ -97,14 +99,16 @@ public:
     void init();
     void addCallback(std::function<void(Packet packet)> callback);
 
-    void sendValue(vector<uint8_t> &value);
-    void sendValue(uint8_t* value, size_t length);
-    void sendString(String &str);
-    void sendJSON(JsonDocument &json);
+    void sendValue(vector<uint8_t> &value, PacketExtraData* extraData = nullptr);
+    void sendValue(uint8_t* value, size_t length, PacketExtraData* extraData = nullptr);
+    void sendString(String &str, PacketExtraData* extraData = nullptr);
+    void sendJSON(JsonDocument &json, PacketExtraData* extraData = nullptr);
 
 private:
+    void proccessExtraData(PacketHeader &header, PacketHeaderData &headerData, PacketExtraData &extraData);
     uint8_t getPacketCount(uint32_t length);
     size_t getFlagSize(PacketHeader &header);
+    void sendPacket(PacketHeader &header);
     void sendPacket(PacketHeader &header, PacketHeaderData &headerData);
     void sendExtPacket();
     void receiveData(vector<uint8_t> &value);

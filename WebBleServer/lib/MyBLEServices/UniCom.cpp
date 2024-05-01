@@ -173,6 +173,24 @@ size_t UniCom::getFlagSize(PacketHeader &header) {
     return unmapFlag[header.flags];
 }
 
+void UniCom::sendPacket(PacketHeader &header) {
+    DEBUG_MSG("Sending packet...\n");
+
+    // Calculate packet size
+    size_t length = PACKET_HEADER_SIZE;
+
+    // Allocate memory
+    uint8_t* data = new uint8_t[length];
+
+    // Fill memory with data
+    memcpy(data, &header, PACKET_HEADER_SIZE);
+
+    // Send packet
+    pCharacteristic->indicate(data, length);
+
+    delete data;
+}
+
 void UniCom::sendPacket(PacketHeader &header, PacketHeaderData &headerData) {
     DEBUG_MSG("Sending packet...\n");
 
@@ -239,7 +257,13 @@ void UniCom::sendExtPacket() {
     }
 }
 
-void UniCom::sendValue(uint8_t* value, size_t length) {
+void UniCom::proccessExtraData(PacketHeader &header, PacketHeaderData &headerData, PacketExtraData &extraData) {
+    header.flags = extraData.flags;
+    headerData.id = extraData.id;
+    headerData.length = extraData.length;
+}
+
+void UniCom::sendValue(uint8_t* value, size_t length, PacketExtraData* extraData /* nullptr */) {
     DEBUG_MSG("Sending value...\n");
 
     if(sendState.isInProgress) {
@@ -255,16 +279,20 @@ void UniCom::sendValue(uint8_t* value, size_t length) {
     };
 
     PacketHeaderData headerData;
+    if(extraData != nullptr) {
+        proccessExtraData(header, headerData, *extraData);
+    }
+
     headerData.data.assign(value, value+length);
 
     sendPacket(header, headerData);
 }
 
-void UniCom::sendValue(vector<uint8_t> &value) {
-    sendValue(value.data(), value.size());
+void UniCom::sendValue(vector<uint8_t> &value, PacketExtraData* extraData /* nullptr */) {
+    sendValue(value.data(), value.size(), extraData);
 }
 
-void UniCom::sendString(String &str) {
+void UniCom::sendString(String &str, PacketExtraData* extraData /* nullptr */) {
     DEBUG_MSG("Sending String...\n");
 
     if(sendState.isInProgress) {
@@ -277,31 +305,34 @@ void UniCom::sendString(String &str) {
         return;
     }
 
-    PacketHeader packetHeader = {
+    sendState.isInProgress = true;
+    sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
+    sendState.pos = 0;
+
+    PacketHeader header = {
         .packetType = PACKET_DATA,
         .dataType = STRING,
         .flags = NO_FLAG,
         .count = getPacketCount(str.length()),
     };
 
-    PacketHeaderData packetHeaderData;
-
-    sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
-    sendState.pos = 0;
-    sendState.isInProgress = true;
-
-
-    sendPacket(packetHeader, packetHeaderData);
+    PacketHeaderData headerData;
+    if(extraData != nullptr) {
+        proccessExtraData(header, headerData, *extraData);
+        sendPacket(header, headerData);
+    } else {
+        sendPacket(header);
+    }
 }
 
-void UniCom::sendJSON(JsonDocument &json) {
+void UniCom::sendJSON(JsonDocument &json, PacketExtraData* extraData /* nullptr */) {
     DEBUG_MSG("Sending JSON...\n");
 
     if(sendState.isInProgress) {
         DEBUG_MSG("Transaction is already in progress!\n");
         return;
     }
-    
+
     // Generate the minified JSON and send it
     String str;
     serializeJson(json, str);
@@ -313,19 +344,22 @@ void UniCom::sendJSON(JsonDocument &json) {
 
     DEBUG_MSG("Serialized JSON: %s\n", str.c_str());
 
-    PacketHeader packetHeader = {
+    sendState.isInProgress = true;
+    sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
+    sendState.pos = 0;
+
+    PacketHeader header = {
         .packetType = PACKET_DATA,
         .dataType = JSON,
         .flags = NO_FLAG,
         .count = getPacketCount(str.length()),
     };
 
-    PacketHeaderData packetHeaderData;
-
-    sendState.buffer.assign(str.c_str(), str.c_str() + str.length());
-    sendState.pos = 0;
-    sendState.isInProgress = true;
-
-
-    sendPacket(packetHeader, packetHeaderData);
+    PacketHeaderData headerData;
+    if(extraData != nullptr) {
+        proccessExtraData(header, headerData, *extraData);
+        sendPacket(header, headerData);
+    } else {
+        sendPacket(header);
+    }
 }
