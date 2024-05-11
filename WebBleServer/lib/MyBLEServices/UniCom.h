@@ -14,7 +14,7 @@ class UniCom : public NimBLECharacteristicCallbacks {
 private:
     enum { // Header sizes
         ATT_OP_HEADER = 3, // ATT header size for write, read, notification, indication
-        UNICOM_HEADER = 4,
+        UNICOM_HEADER = 8,
         UNICOM_DATA_HEADER = 1,
     };
 
@@ -30,49 +30,29 @@ public:
         JSON = 0x30,
     } DataType;
 
-    typedef enum : uint8_t {
+    typedef enum : uint16_t {
         NO_FLAG = 0,
         ID_FLAG = 1,
-        LEN_FLAG = 2,
     } PacketFlag;
 
 private:
     // It may be expanded with other data, based on flags
     typedef struct {
         uint16_t id;
-        uint32_t length;
     } PacketHeaderData;
 
     typedef struct {
         PacketType packetType;
         DataType dataType;
-        uint8_t count;
         PacketFlag flags;
-        PacketHeaderData extraData;
+        uint32_t length;
+        PacketHeaderData data;
     } PacketHeader;
 
-    typedef struct {
-        bool isInProgress;
-        vector<uint8_t> buffer;
-        uint32_t pos;
-    } SendingState; 
-    SendingState sendState;
-
-    typedef struct {
-        bool isInProgress;
-        vector<uint8_t> buffer;
-        uint8_t count;
-        uint8_t counter;
-        DataType dataType;
-    } ReceivingState; 
-    ReceivingState recState;
-
-public :
-    // It may be expanded with other data, based on flags
+public:
     typedef struct {
         PacketFlag flags;
-        uint16_t id;
-        uint32_t length;
+        PacketHeaderData data;
     } PacketExtraData;
 
     typedef struct {
@@ -82,6 +62,21 @@ public :
     } Packet;
 
     int ATT_MTU;
+
+private:
+    typedef struct {
+        bool isInProgress;
+        vector<uint8_t> buffer;
+        uint32_t pos;
+    } SendingState; 
+    SendingState send;
+
+    typedef struct {
+        bool isInProgress;
+        Packet packet;
+        uint32_t length;
+    } ReceivingState; 
+    ReceivingState receive;
 
 private:
     bool isInitialized;
