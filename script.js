@@ -108,7 +108,7 @@ class UniCom {
         this.sizes = {
             att_mtu : 103, // Max 512
             att_op_header : 3,
-            unicom_header : 4,
+            unicom_header : 8,
             unicom_data_header : 1,
         }
         this.payload_size = this.sizes.att_mtu - this.sizes.att_op_header - this.sizes.unicom_data_header;
@@ -127,7 +127,6 @@ class UniCom {
         this.flags = {
             no_flag : 0,
             id_flag : 1,
-            len_flag : 2
         };
 
         // Get site dom
@@ -142,18 +141,17 @@ class UniCom {
         };
 
         this.send = {
-            buffer : new Uint8Array(2000),
             isInProgress : false,
+            buffer : new Uint8Array(2000),
             pos : 0,
         };
 
         this.receive = {
-            dataType : 0,
-            buffer : new Uint8Array(2000),
             isInProgress : false,
+            buffer : new Uint8Array(2000),
             pos : 0,
-            count : 0,
-            counter : 0
+            length : 0,
+            dataType : 0,
         };
     }
 
@@ -176,13 +174,32 @@ class UniCom {
         }
     }
 
+    uint8ArrayToNum(arr, offset, bytes) {
+        if(bytes == 2)
+            return new DataView(arr.buffer, offset, bytes).getUint16(0, true);
+        if(bytes == 4)
+            return new DataView(arr.buffer, offset, bytes).getUint32(0, true);
+        return 0;
+    }
+
+    numToUint8Array(num, bytes = 4) {
+        let arr = new Uint8Array(bytes);
+      
+        for (let i = 0; i < bytes; i++) {
+          arr[i] = num % 256;
+          num = Math.floor(num / 256);
+        }
+      
+        return arr;
+    }
+
     unpack(packet) {
         return {
             header : {
                 packetType : packet[0],
                 dataType : packet[1],
-                count : packet[2],
-                flags : packet[3],
+                flags : this.uint8ArrayToNum(packet, 2, 2),
+                length : this.uint8ArrayToNum(packet, 4, 4),
             },
             data : packet.subarray(4)
         };
@@ -214,13 +231,17 @@ class UniCom {
     }
 
     handleHeader(value) {
+        console.log("Received header packet...");
+
         let received = this.unpack(value);
         let header = received.header;
+        let data = received.data;
+
         switch(header.dataType) {
             case this.dataType.value:
             case this.dataType.string:
             case this.dataType.json:
-                this.proccessStream(header.dataType, header.count);
+                this.proccessStream(header.dataType, header.length);
                 break;
             default:
                 console.log("Error: Unknown data type!");
@@ -234,10 +255,9 @@ class UniCom {
         this.receive.buffer.set(subarr, this.receive.pos);
         this.receive.pos += subarr.length;
 
-        this.receive.counter += 1;
-        if(this.receive.count == this.receive.counter) {
+        if(this.receive.pos >= this.receive.length) {
             // Fit array to data
-            this.receive.buffer = this.receive.buffer.subarray(0, this.receive.pos);
+            this.receive.buffer = this.receive.buffer.subarray(0, this.receive.length);
 
             switch(this.receive.dataType) {
                 case this.dataType.value:
@@ -260,23 +280,24 @@ class UniCom {
         }
     }
 
-    proccessStream(dataType, count) {
-        this.receive.dataType = dataType;
+    proccessStream(dataType, length) {
+        this.receive.isInProgress = true;
         this.receive.buffer = new Uint8Array(2000);
         this.receive.pos = 0;
-        this.receive.count = count;
-        this.receive.counter = 0;
-        this.receive.isInProgress = true;
+        this.receive.length = length;
+        this.receive.dataType = dataType;
         this.btn.response.innerHTML = 'In progess...';
     }
 
     getFlagSize(flags) {
-        // Unmap additional size based on flags selected
-        let unmapFlag = [0, 2, 4, 6];
-        return unmapFlag[flags];
+        let size = 0;
+        if(flags & this.flags.id_flag) {
+            size += 2;
+        } 
+        return size;
     }
 
-    async sendHeader(header, headerData = null) {
+    async sendHeader(header) {
         if(this.isInProgress) {
             console.log("Cannot send packet! A transaction is already in progress.");
             return;
@@ -286,20 +307,25 @@ class UniCom {
         let offset = 0;
 
         let data = new Int8Array(length);
+
         data[0] = this.packetType.header;
         data[1] = header.dataType;
-        data[2] = header.count;
-        data[3] = header.flags;
-        offset += 4;
+
+        let flags = this.numToUint8Array(header.flags, 2);
+        data[2] = flags[0];
+        data[3] = flags[1];
+
+        let lenArr = this.numToUint8Array(header.length, 4);
+        data[4] = lenArr[0];
+        data[5] = lenArr[1];
+        data[6] = lenArr[2];
+        data[7] = lenArr[3];
+
+        offset += 8;
 
         if(header.flags & this.flags.id_flag) {
-            data.set(headerData.id, offset);
+            data.set(this.numToUint8Array(header.data.id, 2), offset);
             offset += 2; // ID field size
-        }
-
-        if(header.flags & this.flags.len_flag) {
-            data.set(headerData.length, offset);
-            offset += 4; // LEN field size
         }
 
         console.log("Sending header (HEX): ", this.bufferToHex(data));
@@ -313,10 +339,9 @@ class UniCom {
         await this.uniCom.char.writeValue(data);
     }
 
-    copyExtraToHeader(header, headerData, extraData) {
+    copyExtraToHeader(header, extraData) {
         header.flags = extraData.flags;
-        headerData.id = extraData.id;
-        headerData.length = extraData.length;
+        header.data.id = extraData.data.id;
     }
 
     async sendStream(data) {
@@ -330,9 +355,23 @@ class UniCom {
         }
     }
 
-    async sendValue(value, extraData = null) {
-        console.log("Sending value...");
+    createHeader(dataType, length, extraData = null) {
+        let header = {
+            packetType : this.packetType.header,
+            dataType : dataType,
+            flags : this.flags.no_flag,
+            length : length,
+        };
 
+        if(extraData != null) {
+            header.data = {};
+            header.data.id = extraData.data.id;
+        }
+
+        return header;
+    }
+
+    async sendRawData(dataType, value, extraData = null) {
         if(this.send.isInProgress) {
             console.log("Cannot send value! A transaction is already in progress!");
             return;
@@ -340,69 +379,28 @@ class UniCom {
 
         this.send.isInProgress = true;
 
-        let header = {
-            dataType : this.dataType.value,
-            flags : this.flags.no_flag,
-            count : Math.ceil(value.length/this.payload_size),
-        };
-
-        let headerData = { id : 0 };
-        if(extraData != null) {
-            this.copyExtraToHeader(header, headerData, extraData);
-        }
-        await this.sendHeader(header, headerData);
+        let header = this.createHeader(dataType, value.length, extraData);
+        await this.sendHeader(header, extraData);
         await this.sendStream(value);
 
         this.send.isInProgress = false;
     }
 
+    async sendValue(value, extraData = null) {
+        console.log("Sending value...");
+        await this.sendRawData(this.dataType.value, value, extraData);
+    }
+
     async sendString(string, extraData = null) {
         console.log("Sending string...");
-
-        if(this.isInProgress) {
-            console.log("Cannot send string! A transaction is already in progress!");
-            return;
-        }
-
-        this.send.isInProgress = true;
-
-        let header = {
-            dataType : this.dataType.string,
-            flags : this.flags.no_flag,
-            count : Math.ceil(string.length/this.payload_size),
-        };
-
-        let headerData = { id : 0 };
-        if(extraData != null) {
-            this.copyExtraToHeader(header, headerData, extraData);
-        }
-        await this.sendHeader(header, headerData);
-        await this.sendStream(new TextEncoder().encode(string));
-
-        this.send.isInProgress = false;
+        await this.sendRawData(this.dataType.string, new TextEncoder().encode(string), extraData);
     }
 
     async sendJSON(object, extraData = null) {
         console.log("Sending json...");
 
-        this.send.isInProgress = true;
-
         let serialized = JSON.stringify(object);
-
-        let header = {
-            dataType : this.dataType.json,
-            flags : this.flags.no_flag,
-            count : Math.ceil(serialized.length/this.payload_size),
-        };
-
-        let headerData = { id : 0 };
-        if(extraData != null) {
-            this.copyExtraToHeader(header, headerData, extraData);
-        }
-        await this.sendHeader(header, headerData);
-        await this.sendStream(new TextEncoder().encode(serialized));
-
-        this.send.isInProgress = false;
+        await this.sendRawData(this.dataType.string, new TextEncoder().encode(serialized), extraData);
     }
 
     async requestData(value) {
@@ -421,31 +419,16 @@ class UniCom {
         }
     }
 
-    numToUint8Array(num, bytes = 4) {
-        let arr = new Uint8Array(bytes);
-      
-        for (let i = 0; i < bytes; i++) {
-          arr[i] = num % 256;
-          num = Math.floor(num / 256);
-        }
-      
-        return arr;
-      }
-
     bindButtons() {
         this.btn.btnR1.addEventListener('click', () => this.requestData(1));
         this.btn.btnR2.addEventListener('click', () => this.requestData(2));
         this.btn.btnR3.addEventListener('click', () => this.requestData(3));
         let extraData1 = {
             flags : this.flags.id_flag,
-            id : this.numToUint8Array(123, 2),
+            data : { id : 123},
         };
         this.btn.btnS1.addEventListener('click', () => this.sendValue(new Uint8Array([10]), extraData1));
-        let extraData2 = {
-            flags : this.flags.len_flag,
-            length : this.numToUint8Array(700, 4),
-        };
-        this.btn.btnS2.addEventListener('click', () => this.sendString("1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000", extraData2));
+        this.btn.btnS2.addEventListener('click', () => this.sendString("1111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000"));
         // this.btn.btnS2.addEventListener('click', () => this.sendString("Hello BLE!"));
         let object = {
             username : 'Sany9',
