@@ -105,9 +105,17 @@ class RNTService {
 class UniCom {
     constructor(webBLE) {
         // "Enums"
+        this.sizes = {
+            att_mtu : 103, // Max 512
+            att_op_header : 3,
+            unicom_header : 4,
+            unicom_data_header : 1,
+        }
+        this.payload_size = this.sizes.att_mtu - this.sizes.att_op_header - this.sizes.unicom_data_header;
+
         this.packetType = {
-            data : 0x0D,
-            extData : 0xED
+            header : 0x0F,
+            data : 0x0D
         };
 
         this.dataType = {
@@ -147,9 +155,6 @@ class UniCom {
             count : 0,
             counter : 0
         };
-
-        // this.data_size = 497 - 1; // UniCom Header size is 1
-        this.data_size = 99; // UniCom Header size is 1
     }
 
     async getService(bleServer) {
@@ -176,8 +181,8 @@ class UniCom {
             header : {
                 packetType : packet[0],
                 dataType : packet[1],
-                flags : packet[2],
-                count : packet[3]
+                count : packet[2],
+                flags : packet[3],
             },
             data : packet.subarray(4)
         };
@@ -192,37 +197,28 @@ class UniCom {
     handleReceived(event) {
         // Convert data
         let value = new Uint8Array(event.target.value.buffer);
-        let received = this.unpack(value);
-        if(received.header.count > 0) {
-
-        }
-        
         let packetType = value[0];
         console.log("Received value (HEX): ", this.bufferToHex(value));
 
         // Proccess data
         switch(packetType) {
+            case this.packetType.header:
+                this.handleHeader(value);
+                break;
             case this.packetType.data:
                 this.handleData(value);
-                break;
-            case this.packetType.extData:
-                this.handleExtData(value);
                 break;
             default:
                 console.log("Error: Unknown packet type!");
         }
     }
 
-    handleData(value) {
+    handleHeader(value) {
         let received = this.unpack(value);
         let header = received.header;
-        switch(received.header.dataType) {
+        switch(header.dataType) {
             case this.dataType.value:
-                this.proccessValue(received.data);
-                break;
             case this.dataType.string:
-                this.proccessStream(header.dataType, header.count);
-                break;
             case this.dataType.json:
                 this.proccessStream(header.dataType, header.count);
                 break;
@@ -231,8 +227,8 @@ class UniCom {
         }
     }
 
-    handleExtData(value) {
-        console.log("Received ext data...");
+    handleData(value) {
+        console.log("Received data packet...");
 
         let subarr = value.subarray(1);
         this.receive.buffer.set(subarr, this.receive.pos);
@@ -240,9 +236,13 @@ class UniCom {
 
         this.receive.counter += 1;
         if(this.receive.count == this.receive.counter) {
+            // Fit array to data
             this.receive.buffer = this.receive.buffer.subarray(0, this.receive.pos);
 
             switch(this.receive.dataType) {
+                case this.dataType.value:
+                    this.btn.response.innerHTML = this.receive.buffer;
+                    break;
                 case this.dataType.string:
                     this.btn.response.innerHTML = new TextDecoder().decode(this.receive.buffer);
                     break;
@@ -258,11 +258,6 @@ class UniCom {
                     console.log(this.bufferToHex(this.receive.buffer));
             }
         }
-    }
-
-    proccessValue(data) {
-        this.receive.buffer = data;
-        this.btn.response.innerHTML = this.receive.buffer;
     }
 
     proccessStream(dataType, count) {
@@ -281,56 +276,40 @@ class UniCom {
         return unmapFlag[flags];
     }
 
-    getDataSize(headerData) {
-        if(headerData == null) {
-            return 0;
-        }
-
-        if(headerData.data == null) {
-            return 0;
-        }
-
-        return headerData.data.length;
-    }
-
-    async sendPacket(header, headerData = null) {
+    async sendHeader(header, headerData = null) {
         if(this.isInProgress) {
             console.log("Cannot send packet! A transaction is already in progress.");
             return;
         }
 
-        let length = 4 + this.getFlagSize(header.flags) + this.getDataSize(headerData);
+        let length = this.sizes.unicom_header + this.getFlagSize(header.flags);
         let offset = 0;
 
         let data = new Int8Array(length);
-        data[0] = this.packetType.data;
+        data[0] = this.packetType.header;
         data[1] = header.dataType;
-        data[2] = header.flags;
-        data[3] = header.count;
+        data[2] = header.count;
+        data[3] = header.flags;
         offset += 4;
 
         if(header.flags & this.flags.id_flag) {
             data.set(headerData.id, offset);
-            offset += 2;
+            offset += 2; // ID field size
         }
 
         if(header.flags & this.flags.len_flag) {
             data.set(headerData.length, offset);
-            offset += 4;
+            offset += 4; // LEN field size
         }
 
-        if(header.dataType == this.dataType.value) {
-            data.set(headerData.data, offset);
-        }
-
-        console.log("Sending value (HEX): ", this.bufferToHex(data));
+        console.log("Sending header (HEX): ", this.bufferToHex(data));
         await this.uniCom.char.writeValue(data);
     }
 
-    async sendExtPacket(value) {
-        let data = new Uint8Array(1 + value.length);
-        data[0] = this.packetType.extData;
-        data.set(value, 1);
+    async sendData(value) {
+        let data = new Uint8Array(this.sizes.unicom_data_header + value.length);
+        data[0] = this.packetType.data;
+        data.set(value, this.sizes.unicom_data_header);
         await this.uniCom.char.writeValue(data);
     }
 
@@ -338,6 +317,17 @@ class UniCom {
         header.flags = extraData.flags;
         headerData.id = extraData.id;
         headerData.length = extraData.length;
+    }
+
+    async sendStream(data) {
+        let pos = 0;
+
+        while(pos < data.length) {
+            let length = Math.min(this.payload_size, data.length-pos);
+            let subarr = data.subarray(pos, pos+length);
+            pos += length;
+            await this.sendData(subarr);
+        }
     }
 
     async sendValue(value, extraData = null) {
@@ -353,30 +343,17 @@ class UniCom {
         let header = {
             dataType : this.dataType.value,
             flags : this.flags.no_flag,
-            count : 0,
+            count : Math.ceil(value.length/this.payload_size),
         };
 
-        let headerData = {
-            data : value
-        };
+        let headerData = { id : 0 };
         if(extraData != null) {
             this.copyExtraToHeader(header, headerData, extraData);
         }
-
-        await this.sendPacket(header, headerData);
+        await this.sendHeader(header, headerData);
+        await this.sendStream(value);
 
         this.send.isInProgress = false;
-    }
-
-    async sendStream(data) {
-        let pos = 0;
-
-        while(pos < data.length) {
-            let length = Math.min(this.data_size, data.length-pos);
-            let subarr = data.subarray(pos, pos+length);
-            pos += length;
-            await this.sendExtPacket(subarr);
-        }
     }
 
     async sendString(string, extraData = null) {
@@ -392,15 +369,14 @@ class UniCom {
         let header = {
             dataType : this.dataType.string,
             flags : this.flags.no_flag,
-            count : Math.ceil(string.length/this.data_size),
+            count : Math.ceil(string.length/this.payload_size),
         };
 
-        let headerData = { data : null };
+        let headerData = { id : 0 };
         if(extraData != null) {
             this.copyExtraToHeader(header, headerData, extraData);
         }
-
-        await this.sendPacket(header, headerData);
+        await this.sendHeader(header, headerData);
         await this.sendStream(new TextEncoder().encode(string));
 
         this.send.isInProgress = false;
@@ -416,15 +392,14 @@ class UniCom {
         let header = {
             dataType : this.dataType.json,
             flags : this.flags.no_flag,
-            count : Math.ceil(serialized.length/this.data_size),
+            count : Math.ceil(serialized.length/this.payload_size),
         };
 
-        let headerData = { data : null };
+        let headerData = { id : 0 };
         if(extraData != null) {
             this.copyExtraToHeader(header, headerData, extraData);
         }
-
-        await this.sendPacket(header, headerData);
+        await this.sendHeader(header, headerData);
         await this.sendStream(new TextEncoder().encode(serialized));
 
         this.send.isInProgress = false;
@@ -587,13 +562,18 @@ class WebBLE {
         try {
             console.log('Initializing Bluetooth...');
             this.ble.device = await navigator.bluetooth.requestDevice({
-                filters: [{namePrefix: this.ble.deviceName}],
-                //filters: [{name: this.rnt.deviceName}],
-                optionalServices: [
-                    this.rntService.getServiceUUID(),
+                //filters: [{namePrefix: this.ble.deviceName}],
+                // filters: [{name: 'ESP32'}],
+                filters: [{services: [
+                    // this.rntService.getServiceUUID(), // for some reason this doesn't work?
                     this.unicomService.getServiceUUID()
-                ]
+                ]}],
+                // optionalServices: [
+                //     this.rntService.getServiceUUID(),
+                //     this.unicomService.getServiceUUID()
+                // ]
             });
+
             console.log('Device Selected:', this.ble.device.name);
     
             this.dom.bleStateContainer.innerHTML = 'Connected to device ' + this.ble.device.name;

@@ -12,17 +12,16 @@ using std::vector;
 // Universal Communication
 class UniCom : public NimBLECharacteristicCallbacks {
 private:
-    enum {
-        ATT_HEADER = 3, // ATT header size for write, read, notification, indication
-        UNICOM_HEADER = 1,
-        PACKET_HEADER_SIZE = 4,
-        PACKET_VIRTUAL_MAX_SIZE,
+    enum { // Header sizes
+        ATT_OP_HEADER = 3, // ATT header size for write, read, notification, indication
+        UNICOM_HEADER = 4,
+        UNICOM_DATA_HEADER = 1,
     };
 
 public:
     typedef enum : uint8_t {
+        PACKET_HEADER = 0x0F,
         PACKET_DATA = 0x0D,
-        PACKET_EXT_DATA = 0xED,
     } PacketType;
 
     typedef enum : uint8_t {
@@ -38,24 +37,19 @@ public:
     } PacketFlag;
 
 private:
-    typedef struct {
-        PacketType packetType;
-        DataType dataType;
-        PacketFlag flags;
-        uint8_t count;
-    } PacketHeader;
-
+    // It may be expanded with other data, based on flags
     typedef struct {
         uint16_t id;
         uint32_t length;
-        vector<uint8_t> data;
     } PacketHeaderData;
 
-    // typedef enum : uint8_t {
-    //     IDLE = 0,
-    //     SENDING = 1,
-    //     RECEIVING = 2,
-    // } ProgressType;
+    typedef struct {
+        PacketType packetType;
+        DataType dataType;
+        uint8_t count;
+        PacketFlag flags;
+        PacketHeaderData extraData;
+    } PacketHeader;
 
     typedef struct {
         bool isInProgress;
@@ -69,6 +63,7 @@ private:
         vector<uint8_t> buffer;
         uint8_t count;
         uint8_t counter;
+        DataType dataType;
     } ReceivingState; 
     ReceivingState recState;
 
@@ -86,7 +81,7 @@ public :
         PacketExtraData extraData;
     } Packet;
 
-    int att_mtu;
+    int ATT_MTU;
 
 private:
     bool isInitialized;
@@ -95,6 +90,7 @@ private:
     NimBLECharacteristic *pCharacteristic;
 
 public:
+    // User interface functions
     UniCom(int bufferSize = 2000);
     void init();
     void addCallback(std::function<void(Packet packet)> callback);
@@ -105,14 +101,17 @@ public:
     void sendJSON(JsonDocument &json, PacketExtraData* extraData = nullptr);
 
 private:
-    void proccessExtraData(PacketHeader &header, PacketHeaderData &headerData, PacketExtraData &extraData);
+    // Utility
+    PacketHeader createHeader(DataType dataType, size_t length, PacketExtraData* extraData = nullptr);
     uint8_t getPacketCount(uint32_t length);
     size_t getFlagSize(PacketHeader &header);
-    void sendPacket(PacketHeader &header);
-    void sendPacket(PacketHeader &header, PacketHeaderData &headerData);
-    void sendExtPacket();
+    // Send
+    void sendHeader(PacketHeader &header);
+    void sendData();
+    void setupSendingState(DataType dataType, uint8_t* value, size_t length, PacketExtraData* extraData = nullptr);
+    // Receive
+    void receiveHeader(vector<uint8_t> &value);
     void receiveData(vector<uint8_t> &value);
-    void receiveExtData(vector<uint8_t> &value);
 
     // Nimble callback functions
     void onStatus(NimBLECharacteristic* pCharacteristic, Status s, int code);
