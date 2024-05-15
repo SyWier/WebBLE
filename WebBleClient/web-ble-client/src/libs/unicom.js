@@ -57,6 +57,8 @@ class UniCom {
         }
 
         this.callback = () => null;
+
+        this.isInitialized = false;
     }
 
     async getService(bleServer) {
@@ -73,6 +75,8 @@ class UniCom {
             // Start notifications
             this.uniCom.char.startNotifications();
             console.log("Notifications Started.");
+
+            this.isInitialized = true;
         } catch(error) {
             console.error("Error: ", error);
         }
@@ -269,6 +273,11 @@ class UniCom {
         if(!this.webble.isBleConnected()) {
             return false;
         }
+
+        if(!this.isInitialized) {
+            return false;
+        }
+
         if(this.send.isInProgress) {
             console.log("Cannot send value! A transaction is already in progress!");
             return;
@@ -300,21 +309,21 @@ class UniCom {
         await this.sendRawData(this.dataType.string, new TextEncoder().encode(serialized), extraData);
     }
 
-    async requestData(value) {
-        if(!this.webble.isBleConnected()) {
-            return false;
-        }
-        if(!this.uniCom.char) {
-            return false;
-        }
+    // async requestData(value) {
+    //     if(!this.webble.isBleConnected()) {
+    //         return false;
+    //     }
+    //     if(!this.uniCom.char) {
+    //         return false;
+    //     }
 
-        try {
-            console.log("Send Value:", value);
-            await this.sendValue(new Uint8Array([value]));
-        } catch(error) {
-            console.error("Error requesting data: ", error);
-        }
-    }
+    //     try {
+    //         console.log("Send Value:", value);
+    //         await this.sendValue(new Uint8Array([value]));
+    //     } catch(error) {
+    //         console.error("Error requesting data: ", error);
+    //     }
+    // }
 
     bindButtons() {
         this.btn.btnR1.addEventListener('click', () => this.requestData(1));

@@ -48,8 +48,13 @@ class PasswordManager extends React.Component {
   }
 
   requestData(command) {
-    unicom.requestData(command);
-    this.setState({text: "In progress..."});
+    try {
+      console.log("Request value by command:", command);
+      unicom.sendValue(new Uint8Array([command]));
+      this.setState({text: "In progress..."});
+    } catch(error) {
+        console.error("Error requesting data: ", error);
+    }
   }
 
   requestCallback(packet) {
@@ -72,6 +77,7 @@ class PasswordManager extends React.Component {
         console.log("Unkown data type received");
         console.log(unicom.bufferToHex(packet.data));
     }
+
     this.setState({text: val});
   }
 
