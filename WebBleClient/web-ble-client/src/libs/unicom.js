@@ -1,6 +1,7 @@
 import { RemoveCircleRounded } from "@mui/icons-material";
 
 class UniCom {
+    /* Construct data types */
     constructor(webble) {
         console.log("Creating UniCom...");
 
@@ -67,6 +68,8 @@ class UniCom {
         this.isInitialized = false;
     }
 
+    /* User functions */
+    // Initialize the UniCom service
     async getService(bleServer) {
         try {
             // Get service
@@ -88,6 +91,115 @@ class UniCom {
         }
     }
 
+    // Callback funtion to notify application about received data
+    addCallback(func) {
+        this.callback = func;
+    }
+
+    // Funtions to send different types of data
+    async sendRawData(dataType, value, extraData = null) {
+        console.log("Sending data...");
+
+        if(!this.webble.isBleConnected()) {
+            throw new Error('Cannot send data! Device is not connected!');
+        }
+
+        if(!this.isInitialized) {
+            throw new Error('Cannot send data! UniCom service is not initialized yet!');
+        }
+
+        if(this.send.isInProgress) {
+            throw new Error('Cannot send data! A transaction is already in progress!');
+        }
+
+        this.send.isInProgress = true;
+
+        let header = this.createHeader(dataType, value.length, extraData);
+        await this.sendHeader(header, extraData);
+        await this.sendStream(value);
+
+        this.send.isInProgress = false;
+    }
+
+    async sendValue(value, extraData = null) {
+        console.log("Sending value...");
+        await this.sendRawData(this.dataType.VALUE, value, extraData);
+    }
+
+    async sendString(string, extraData = null) {
+        console.log("Sending string...");
+        await this.sendRawData(this.dataType.STRING, new TextEncoder().encode(string), extraData);
+    }
+
+    async sendJSON(object, extraData = null) {
+        console.log("Sending json...");
+
+        let serialized = JSON.stringify(object);
+        await this.sendRawData(this.dataType.STRING, new TextEncoder().encode(serialized), extraData);
+    }
+
+    // Function to make the server-client communication easier
+    // By requesting a data, we wait for server response
+    async requestData(command, extraData = null) {
+        if(this.isRequested) {
+            console.log("A request is already is in progess!");
+        }
+        this.isRequested = true;
+        await this.sendRawData(this.dataType.VALUE, command, extraData);
+        // We could reach this part fo the code sooner then the reply would set the variable
+        this.receive.isInProgress = true;
+        // Wait until the transmission finishes
+        while(this.receive.isInProgress) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        this.isRequested = false;
+    }
+
+    async requestValue(command, extraData = null) {
+        console.log("Requesting value...");
+
+        await this.requestData(command, extraData = null);
+
+        return this.packet;
+    }
+
+    async requestString(command, extraData = null) {
+        console.log("Requesting string...");
+
+        await this.requestData(command, extraData = null);
+
+        this.packet.data = new TextDecoder().decode(this.packet.data);
+        return this.packet;
+    }
+
+    async requestJSON(command, extraData = null) {
+        console.log("Requesting JSON...");
+
+        await this.requestData(command, extraData = null);
+
+        let jsonString = new TextDecoder().decode(this.packet.data);
+        this.packet.data = JSON.parse(jsonString);
+        return this.packet;
+    }
+
+    // Get UniCom services UUID
+    getServiceUUID() {
+        return this.uniCom.serviceUUID;
+    }
+
+    // Stop the service
+    async stop() {
+        if(this.uniCom.char) {
+            try {
+                await this.uniCom.char.stopNotifications();
+            } catch(error) {
+                console.error("Error: ", error);
+            }
+            console.log("UniCom notifications stopped.");
+        }
+    }
+
+    /* Helper functions to make the other functions cleaner */
     // Helper function to separate incoming data into objects
     unpack(packet) {
         let received = {
@@ -107,6 +219,7 @@ class UniCom {
         return received;
     }
 
+    // Callback funtion called when the characteristics changes
     handleReceived(event) {
         // Convert data
         let value = new Uint8Array(event.target.value.buffer);
@@ -164,6 +277,7 @@ class UniCom {
         }
     }
 
+    // Reset received state
     initializeNewData(dataType, length) {
         this.receive.isInProgress = true;
         this.receive.buffer = new Uint8Array(2000);
@@ -172,6 +286,7 @@ class UniCom {
         this.receive.dataType = dataType;
     }
 
+    // Get header extra data size based on flags
     getFlagSize(flags) {
         let size = 0;
         if(flags & this.flags.ID_FLAG) {
@@ -180,12 +295,8 @@ class UniCom {
         return size;
     }
 
+    // Send header packet to server
     async sendHeader(header) {
-        if(this.isInProgress) {
-            console.log("Cannot send packet! A transaction is already in progress.");
-            return;
-        }
-
         let length = this.sizes.UNICOM_HEADER + this.getFlagSize(header.flags);
         let offset = 0;
 
@@ -212,21 +323,27 @@ class UniCom {
         }
 
         console.log("Sending header (HEX): ", bufferToHex(data));
-        await this.uniCom.char.writeValue(data);
+        try {
+            await this.uniCom.char.writeValue(data);
+        } catch(error) {
+            console.error("Error: ", error);
+        }
     }
 
+    // Send data packet to server
     async sendData(value) {
         let data = new Uint8Array(this.sizes.UNICOM_DATA_HEADER + value.length);
         data[0] = this.packetType.DATA;
         data.set(value, this.sizes.UNICOM_DATA_HEADER);
-        await this.uniCom.char.writeValue(data);
+
+        try {
+            await this.uniCom.char.writeValue(data);
+        } catch(error) {
+            console.error("Error: ", error);
+        }
     }
 
-    copyExtraToHeader(header, extraData) {
-        header.flags = extraData.flags;
-        header.data.id = extraData.data.id;
-    }
-
+    // Send buffer in multiple data packets
     async sendStream(data) {
         let pos = 0;
 
@@ -238,6 +355,7 @@ class UniCom {
         }
     }
 
+    // Create header with the defined parameters
     createHeader(dataType, length, extraData = null) {
         let header = {
             packetType : this.packetType.HEADER,
@@ -253,107 +371,9 @@ class UniCom {
 
         return header;
     }
-
-    addCallback(func) {
-        this.callback = func;
-    }
-
-    async sendRawData(dataType, value, extraData = null) {
-        console.log("Sending data...");
-
-        if(!this.webble.isBleConnected()) {
-            return false;
-        }
-
-        if(!this.isInitialized) {
-            return false;
-        }
-
-        if(this.send.isInProgress) {
-            console.log("Cannot send value! A transaction is already in progress!");
-            return;
-        }
-
-        this.send.isInProgress = true;
-
-        let header = this.createHeader(dataType, value.length, extraData);
-        await this.sendHeader(header, extraData);
-        await this.sendStream(value);
-
-        this.send.isInProgress = false;
-    }
-
-    async sendValue(value, extraData = null) {
-        console.log("Sending value...");
-        await this.sendRawData(this.dataType.VALUE, value, extraData);
-    }
-
-    async sendString(string, extraData = null) {
-        console.log("Sending string...");
-        await this.sendRawData(this.dataType.STRING, new TextEncoder().encode(string), extraData);
-    }
-
-    async sendJSON(object, extraData = null) {
-        console.log("Sending json...");
-
-        let serialized = JSON.stringify(object);
-        await this.sendRawData(this.dataType.STRING, new TextEncoder().encode(serialized), extraData);
-    }
-
-    async requestData(command, extraData = null) {
-        if(this.isRequested) {
-            console.log("A request is already is in progess!");
-        }
-        this.isRequested = true;
-        await this.sendRawData(this.dataType.VALUE, command, extraData);
-        // We could reach this part fo the code sooner then the reply would set the variable
-        this.receive.isInProgress = true;
-        while(this.receive.isInProgress) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        this.isRequested = false;
-    }
-
-    async requestValue(command, extraData = null) {
-        console.log("Requesting value...");
-
-        await this.requestData(command, extraData = null);
-
-        return this.packet;
-    }
-
-    async requestString(command, extraData = null) {
-        console.log("Requesting string...");
-
-        await this.requestData(command, extraData = null);
-
-        this.packet.data = new TextDecoder().decode(this.packet.data);
-        return this.packet;
-    }
-
-    async requestJSON(command, extraData = null) {
-        console.log("Requesting JSON...");
-
-        await this.requestData(command, extraData = null);
-
-        let jsonString = new TextDecoder().decode(this.packet.data);
-        this.packet.data = JSON.parse(jsonString);
-        return this.packet;
-    }
-
-    getServiceUUID() {
-        return this.uniCom.serviceUUID;
-    }
-
-    async stop() {
-        if(this.uniCom.char) {
-            await this.uniCom.char.stopNotifications();
-            console.log("UniCom notifications stopped.");
-        }
-    }
 };
 
-
+/* Generic helper function */
 function uint8ArrayToNum(arr, offset, bytes) {
     if(bytes == 2)
         return new DataView(arr.buffer, offset, bytes).getUint16(0, true);

@@ -19,22 +19,37 @@ function PasswordManager() {
 
   // Function to request data and modify textbox text
   async function requestValue(command) {
-    setTextbox({ text: 'In progress...', id: undefined });
-    let packet = await unicom.requestValue(new Uint8Array([command]));
-    setTextbox({ text: packet.data, id: packet?.extraData?.id });
+    try {
+      setTextbox({ text: 'In progress...', id: undefined });
+      let packet = await unicom.requestValue(new Uint8Array([command]));
+      setTextbox({ text: packet.data, id: packet?.extraData?.id });
+    } catch(e) {
+      setTextbox({ text: e.toString(), id: undefined });
+      console.log(e);
+    }
   }
 
   async function requestString(command) {
-    setTextbox({ text: 'In progress...', id: undefined });
-    let packet = await unicom.requestString(new Uint8Array([command]));
-    setTextbox({ text: packet.data, id: packet?.extraData?.id });
+    try {
+      setTextbox({ text: 'In progress...', id: undefined });
+      let packet = await unicom.requestString(new Uint8Array([command]));
+      setTextbox({ text: packet.data, id: packet?.extraData?.id });
+    } catch(e) {
+      setTextbox({ text: e.toString(), id: undefined });
+      console.log(e);
+    }
   }
 
   async function requestJSON(command) {
-    setTextbox({ text: 'In progress...', id: undefined });
-    let packet = await unicom.requestJSON(new Uint8Array([command]));
+    try {
+      setTextbox({ text: 'In progress...', id: undefined });
+      let packet = await unicom.requestJSON(new Uint8Array([command]));
     let jsonString = JSON.stringify(packet.data, null, 2);
     setTextbox({ text: jsonString, id: packet?.extraData?.id });
+    } catch(e) {
+      setTextbox({ text: e.toString(), id: undefined });
+      console.log(e);
+    }
   }
 
   // Textbox element to display answer from the server
