@@ -13,58 +13,42 @@ var unicom = new UniCom(webble);
 webble.addService(unicom);
 
 function PasswordManager() {
-  const[text, setText] = useState('Request data to display text...');
-  const[id, setID] = useState(undefined)
+  const [textbox, setTextbox] = useState({text: 'Request data to display text...', id: undefined});
 
   // Function to request data and modify textbox text
-  function requestData(command) {
-    try {
-      console.log("Request value by command:", command);
-      unicom.sendValue(new Uint8Array([command]));
-      setText("In progress...");
-    } catch(error) {
-        console.error("Error requesting data: ", error);
-    }
+  async function requestValue(command) {
+    setTextbox({ text: 'In progress...', id: undefined });
+    let packet = await unicom.requestValue(new Uint8Array([command]));
+    setTextbox({ text: packet.data, id: packet?.extraData?.id });
   }
 
-  // The callback function to receive and process data from
-  // the unicom library
-  function requestCallback(packet) {
-    console.log(packet?.extraData?.id);
-    setID(packet?.extraData?.id);
-    switch(packet.dataType) {
-      case unicom.dataType.value:
-        setText(packet.data);
-        return;
-      case unicom.dataType.string:
-        setText(new TextDecoder().decode(packet.data));
-        return;
-      case unicom.dataType.json:
-        let jsonString = new TextDecoder().decode(packet.data);
-        let json = JSON.parse(jsonString);
-        let jsonPretty = JSON.stringify(json, null, 2);
-        setText(jsonString);
-        console.log(json);
-        return;
-      default:
-        console.log("Unkown data type received");
-        console.log(unicom.bufferToHex(packet.data));
-    }
+  async function requestString(command) {
+    setTextbox({ text: 'In progress...', id: undefined });
+    let packet = await unicom.requestString(new Uint8Array([command]));
+    setTextbox({ text: packet.data, id: packet?.extraData?.id });
   }
-  unicom.addCallback(requestCallback);
+
+  async function requestJSON(command) {
+    setTextbox({ text: 'In progress...', id: undefined });
+    let packet = await unicom.requestJSON(new Uint8Array([command]));
+    let jsonString = JSON.stringify(packet.data, null, 2);
+    setTextbox({ text: jsonString, id: packet?.extraData?.id });
+  }
+
+  unicom.addCallback(() => console.log("Unknown data received."));
 
   // Textbox element to display answer from the server
   function RequestedText(props) {
     let idText = undefined;
-    if(props.id) {
-      idText = <Typography>Message ID: {props.id}</Typography>;
+    if(props.textbox.id) {
+      idText = <Typography>Message ID: {props.textbox.id}</Typography>;
     }
 
     return(
       <Box sx={{width: '75%'}}>
         <h1>Requested Text</h1>
         <Typography style={{overflowWrap: 'break-word'}}>
-          {props.text}
+          {props.textbox.text}
         </Typography>
         {idText}
       </Box>
@@ -93,9 +77,9 @@ function PasswordManager() {
       <Box sx={{width: '25%'}}>
         <h1>Request</h1>
         <Stack direction="row" spacing={1}>
-          <Button onClick={() => requestData(1)} variant="contained">Value</Button>
-          <Button onClick={() => requestData(2)} variant="contained">String</Button>
-          <Button onClick={() => requestData(3)} variant="contained">JSON</Button>
+          <Button onClick={() => requestValue(1)} variant="contained">Value</Button>
+          <Button onClick={() => requestString(2)} variant="contained">String</Button>
+          <Button onClick={() => requestJSON(3)} variant="contained">JSON</Button>
         </Stack>
         <h1>Send</h1>
         <Stack direction="row" spacing={1}>
@@ -104,7 +88,7 @@ function PasswordManager() {
           <Button onClick={() => unicom.sendJSON(objectToSend)} variant="contained">JSON</Button>
         </Stack>
       </Box>
-      <RequestedText text={text} id={id}/>
+      <RequestedText textbox={textbox}/>
     </Stack>
   );
 };
