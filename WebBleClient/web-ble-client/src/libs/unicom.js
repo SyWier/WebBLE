@@ -1,3 +1,5 @@
+import { RemoveCircleRounded } from "@mui/icons-material";
+
 class UniCom {
     constructor(webble) {
         console.log("Creating UniCom...");
@@ -102,15 +104,21 @@ class UniCom {
     }
 
     unpack(packet) {
-        return {
+        let received = {
             header : {
                 packetType : packet[0],
                 dataType : packet[1],
                 flags : this.uint8ArrayToNum(packet, 2, 2),
                 length : this.uint8ArrayToNum(packet, 4, 4),
             },
-            data : packet.subarray(4)
+            extraData : undefined,
         };
+
+        if(received.header.flags == this.flags.id_flag) {
+            received.extraData = {id: this.uint8ArrayToNum(packet, 8, 2)};
+        }
+
+        return received;
     }
 
     bufferToHex(buffer) {
@@ -143,7 +151,7 @@ class UniCom {
 
         let received = this.unpack(value);
         let header = received.header;
-        let data = received.data;
+        this.packet.extraData.id = received.extraData?.id;
 
         switch(header.dataType) {
             case this.dataType.value:
