@@ -164,10 +164,6 @@ class UniCom {
         }
     }
 
-    addCallback(func) {
-        this.callback = func;
-    }
-
     initializeNewData(dataType, length) {
         this.receive.isInProgress = true;
         this.receive.buffer = new Uint8Array(2000);
@@ -258,6 +254,10 @@ class UniCom {
         return header;
     }
 
+    addCallback(func) {
+        this.callback = func;
+    }
+
     async sendRawData(dataType, value, extraData = null) {
         console.log("Sending data...");
 
@@ -304,9 +304,10 @@ class UniCom {
         if(this.isRequested) {
             console.log("A request is already is in progess!");
         }
-
         this.isRequested = true;
         await this.sendRawData(this.dataType.VALUE, command, extraData);
+        // We could reach this part fo the code sooner then the reply would set the variable
+        this.receive.isInProgress = true;
         while(this.receive.isInProgress) {
             await new Promise(resolve => setTimeout(resolve, 500));
         }
@@ -344,9 +345,9 @@ class UniCom {
         return this.uniCom.serviceUUID;
     }
 
-    stop() {
+    async stop() {
         if(this.uniCom.char) {
-            this.uniCom.char.stopNotifications();
+            await this.uniCom.char.stopNotifications();
             console.log("UniCom notifications stopped.");
         }
     }

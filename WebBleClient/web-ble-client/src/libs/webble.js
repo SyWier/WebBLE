@@ -11,6 +11,9 @@ class WebBLE {
         // Services to work with
         this.services = [];
         this.serviceUUIDs = [];
+
+        // Status change callback
+        this.callback = null;
     }
 
     // Check if BLE is available in your Browser
@@ -29,6 +32,7 @@ class WebBLE {
         if(this.server && this.server.connected) {
             return true;
         } else {
+            console.error("Device is not connected!");
             return false;
         }
     }
@@ -53,15 +57,13 @@ class WebBLE {
                 filters: [{ services: this.serviceUUIDs }],
             });
             console.log('Device Selected:', this.device.name);
-    
-            // this.dom.bleStateContainer.innerHTML = 'Connected to device ' + this.device.name;
-            // this.dom.bleStateContainer.style.color = "#24af37";
 
             // Bind onDisconnected event listener
-            this.device.addEventListener('gattservicedisconnected', this.onDisconnected.bind(this));
+            this.device.addEventListener('gattserverdisconnected', this.onDisconnected.bind(this));
     
             // Connect to the gatt server
             this.server = await this.device.gatt.connect();
+            this.isConnected = true;
             console.log("Connected to GATT Server");
 
             // Get all the added services
@@ -69,29 +71,27 @@ class WebBLE {
         } catch(error) {
             console.log('Error: ', error);
         }
+
+        this.callback(true);
     }
 
     // Disconnect from BLE device
     async disconnectDevice() {
         if(!this.isBleConnected()) {
-            console.error("Bluetooth is not connected.");
             window.alert("Bluetooth is not connected!");
             return;
         }
 
-        console.log("Disconnect Device.");
+        console.log("Disconnect Device...");
 
         try {
             // Stop all services
-            this.services.forEach(service => service.stop());
+            await Promise.all(this.services.map(async (service) => {
+                await service.stop();
+            }));
 
             // Disconnect from device
             await this.server.disconnect();
-            console.log("Device Disconnected");
-
-            // this.dom.bleStateContainer.innerHTML = "Device Disconnected";
-            // this.dom.bleStateContainer.style.color = "#d13a30";
-
         } catch(error) {
             console.log("An error occurred:", error);
         }
@@ -99,11 +99,9 @@ class WebBLE {
 
     // Function that is called when the device disconnects
     onDisconnected(event) {
-        console.log('Device Disconnected:', event.target.device.name);
-
-        // this.dom.bleStateContainer.innerHTML = "Device disconnected";
-        // this.dom.bleStateContainer.style.color = "#d13a30";
-
+        this.server = null;
+        console.log('Device Disconnected.');
+        this.callback(false);
     }
 
     // Add a service to WebBLE to discover and handle
@@ -111,6 +109,11 @@ class WebBLE {
         this.services.push(service);
         this.serviceUUIDs.push(service.getServiceUUID());
         console.log("Adding service with UUID:", service.getServiceUUID());
+    }
+
+    // Add callback for 
+    addCallback(func) {
+        this.callback = func;
     }
 };
 

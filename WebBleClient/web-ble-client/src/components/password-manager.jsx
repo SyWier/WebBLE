@@ -12,6 +12,8 @@ var webble = new WebBLE;
 var unicom = new UniCom(webble);
 webble.addService(unicom);
 
+unicom.addCallback(() => console.log("Unknown data received."));
+
 function PasswordManager() {
   const [textbox, setTextbox] = useState({text: 'Request data to display text...', id: undefined});
 
@@ -34,8 +36,6 @@ function PasswordManager() {
     let jsonString = JSON.stringify(packet.data, null, 2);
     setTextbox({ text: jsonString, id: packet?.extraData?.id });
   }
-
-  unicom.addCallback(() => console.log("Unknown data received."));
 
   // Textbox element to display answer from the server
   function RequestedText(props) {
