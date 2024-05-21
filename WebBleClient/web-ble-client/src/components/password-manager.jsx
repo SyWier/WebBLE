@@ -44,8 +44,8 @@ function PasswordManager() {
     try {
       setTextbox({ text: 'In progress...', id: undefined });
       let packet = await unicom.requestJSON(new Uint8Array([command]));
-    let jsonString = JSON.stringify(packet.data, null, 2);
-    setTextbox({ text: jsonString, id: packet?.extraData?.id });
+      let jsonString = JSON.stringify(packet.data, null, 2);
+      setTextbox({ text: jsonString, id: packet?.extraData?.id });
     } catch(e) {
       setTextbox({ text: e.toString(), id: undefined });
       console.log(e);

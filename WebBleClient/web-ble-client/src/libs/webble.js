@@ -63,8 +63,8 @@ class WebBLE {
     
             // Connect to the gatt server
             this.server = await this.device.gatt.connect();
-            this.isConnected = true;
             console.log("Connected to GATT Server");
+            this.callback(true);
 
             // Get all the added services
             this.services.forEach(service => service.getService(this.server));
@@ -72,7 +72,7 @@ class WebBLE {
             console.log('Error: ', error);
         }
 
-        this.callback(true);
+        
     }
 
     // Disconnect from BLE device
