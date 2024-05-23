@@ -8,17 +8,10 @@
 #define DEBUG_MSG(...) 
 #endif
 
-// Calback for the WebBLe server
-class MyServerCallback: public NimBLEServerCallbacks {
-public:
-    void onConnect(NimBLEServer* pServer);
-    void onDisconnect(NimBLEServer* pServer);
-    void onAuthenticationComplete(ble_gap_conn_desc* desc);
-};
-
 // BLE Server for Service handling
-class MyBLEServer {
+class UniBLEServer: public NimBLEServerCallbacks {
 private:
+    static UniBLEServer* uniBLEServer; // "this" pointer, Singleton setup
     static NimBLEServer *pServer;
     static NimBLEAdvertising *pAdvertising;
 
@@ -29,14 +22,13 @@ public:
     static bool isAuthenticated;
 
 public:
-    static void init(const char *deviceName = "ESP32");
+    static void init(const char *deviceName = "ESP32", uint32_t pinCode = 0);
     static void start();
     static NimBLEService* createService(const char* uuid);
     static void adverticeService(const char* uuid);
 
-    // static bool getPinCode();
-    // static bool isConnected();
-    // static NimBLEServer* getServer();
-    // static NimBLEAdvertising* getAdvertising();
-    // static uint32_t getPinCode();
+    // NimBLE callbacks
+    void onConnect(NimBLEServer* pServer);
+    void onDisconnect(NimBLEServer* pServer);
+    void onAuthenticationComplete(ble_gap_conn_desc* desc);
 };

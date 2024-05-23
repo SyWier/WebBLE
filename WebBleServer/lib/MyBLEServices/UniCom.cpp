@@ -137,8 +137,8 @@ UniCom::UniCom(int bufferSize /* 2000 */) {
 
 void UniCom::init() {
     DEBUG_MSG("Initializing UniCom...\n");
-    if(!MyBLEServer::isInitialized) {
-        DEBUG_MSG("Error: MyBLEServer hasn't started yet!\n");
+    if(!UniBLEServer::isInitialized) {
+        DEBUG_MSG("Error: UniBLEServer hasn't started yet!\n");
         return;
     }
 
@@ -151,7 +151,7 @@ void UniCom::init() {
     ATT_MTU = NimBLEDevice::getMTU();
 
     DEBUG_MSG("Creating UniCom Service...\n");
-    pService = MyBLEServer::createService(UNI_SERVICE_UUID);
+    pService = UniBLEServer::createService(UNI_SERVICE_UUID);
 
     // Create UniCom Characteristic with UUID
     DEBUG_MSG("Creating UniCom Characteristics...\n");
@@ -174,7 +174,7 @@ void UniCom::init() {
     pService->start();
 
     // Advertice service
-    MyBLEServer::adverticeService(UNI_SERVICE_UUID);
+    UniBLEServer::adverticeService(UNI_SERVICE_UUID);
 }
 
 void UniCom::addCallback(std::function<void(Packet packet)> callback) {

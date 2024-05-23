@@ -13,7 +13,7 @@ void MyPasswordManager::init() {
 
 void MyPasswordManager::getPacket(UniCom::Packet packet) {
     DEBUG_MSG("Read value...\n");
-    if(!MyBLEServer::isAuthenticated) {
+    if(!UniBLEServer::isAuthenticated) {
         DEBUG_MSG("Device is not authenticated!\n");
         return;
     }

@@ -1,5 +1,5 @@
 #include <NimBLEDevice.h>
-#include <MyBLEServer.h>
+#include <UniBLEServer.h>
 
 // RandomNerdTutorial service
 #define RNT_SERVICE_UUID        "19b10000-e8f2-537e-4f6c-d104768a1214"
@@ -50,7 +50,7 @@ public:
     void init(int ledPin) {
         // Create service with uuid
         DEBUG_MSG("Creating RNT Service...\n");
-        pService =  MyBLEServer::createService(RNT_SERVICE_UUID);
+        pService =  UniBLEServer::createService(RNT_SERVICE_UUID);
 
         // Create sensor characteristic with uuid
         DEBUG_MSG("Creating RNT Fetch Characteristics...\n");
@@ -75,14 +75,14 @@ public:
         pService->start();
 
         // Advertice service
-        MyBLEServer::adverticeService(RNT_SERVICE_UUID);
+        UniBLEServer::adverticeService(RNT_SERVICE_UUID);
     }
     
     void update() {
         static int value = 0;
 
         // notify changed value
-        if (MyBLEServer::isConnected) {
+        if (UniBLEServer::isConnected) {
             String str = String(value++);
             DEBUG_MSG("New value notified: %s\n", str.c_str());
             pSensorCharacteristic->notify((const uint8_t*)str.c_str(), str.length());

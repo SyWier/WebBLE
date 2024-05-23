@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <MyBLEServer.h>
+#include <UniBLEServer.h>
 #include <UniCom.h>
 #include <RNTService.h>
 #include <MyPasswordManager.h>
@@ -14,12 +14,12 @@ RNTService rntService;
 void setup() {
     Serial.begin(115200);
 
-    MyBLEServer::init();
+    UniBLEServer::init();
 
     myPasswordManager.init();
     rntService.init(ledPin);
 
-    MyBLEServer::start();
+    UniBLEServer::start();
 }
 
 void loop() {
