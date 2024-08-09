@@ -1,6 +1,7 @@
 # Web BLE Communication
 
-Universal implementation of the BLE protocol
+This repository is implementing a BLE communication protocol which enables to send large amount of data.<br>
+Traditionally with BLE a packet size maximum is about 512 bytes. With multiple packets we can send the data bits by bits and reassemble at the receiveing side.
 
 ## Folders:
 
